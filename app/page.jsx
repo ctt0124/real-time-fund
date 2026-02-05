@@ -1592,8 +1592,12 @@ export default function HomePage() {
   // 点击页面其他区域时收起删除按钮
   useEffect(() => {
     const handleClickOutside = (e) => {
-      // 如果点击的是删除按钮本身，不处理（删除逻辑会处理）
-      // 这里我们可以通过检查 swipedFundCode 是否存在来决定是否需要收起
+      // 检查点击事件是否来自删除按钮
+      // 如果点击的是 .swipe-action-bg 或其子元素，不执行收起逻辑
+      if (e.target.closest('.swipe-action-bg')) {
+        return;
+      }
+      
       if (swipedFundCode) {
         setSwipedFundCode(null);
       }
