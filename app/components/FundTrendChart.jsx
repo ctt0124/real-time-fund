@@ -89,12 +89,16 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand }) {
   const lineColor = change >= 0 ? upColor : downColor;
   
   const chartData = useMemo(() => {
+    // Calculate percentage change based on the first data point
+    const firstValue = data.length > 0 ? data[0].value : 1;
+    const percentageData = data.map(d => ((d.value - firstValue) / firstValue) * 100);
+
     return {
       labels: data.map(d => d.date),
       datasets: [
         {
-          label: '单位净值',
-          data: data.map(d => d.value),
+          label: '涨跌幅',
+          data: percentageData,
           borderColor: lineColor,
           backgroundColor: (context) => {
             const ctx = context.chart.ctx;
@@ -154,7 +158,8 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand }) {
           ticks: {
             color: '#9ca3af',
             font: { size: 10 },
-            count: 5
+            count: 5,
+            callback: (value) => `${value.toFixed(2)}%`
           },
           border: { display: false }
         }
@@ -240,7 +245,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand }) {
                ctx.fillText(dateStr, x, bottomY + 8);
 
                // Y axis label (value)
-               const valueStr = typeof value === 'number' ? value.toFixed(4) : value;
+               const valueStr = (typeof value === 'number' ? value.toFixed(2) : value) + '%';
                const valWidth = ctx.measureText(valueStr).width + 8;
                ctx.fillStyle = primaryColor;
                ctx.fillRect(rightX - valWidth, y - 8, valWidth, 16);
