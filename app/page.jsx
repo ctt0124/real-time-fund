@@ -2517,6 +2517,7 @@ export default function HomePage() {
       let worker = ocrWorkerRef.current;
       if (!worker) {
         const cdnBases = [
+          'https://lf3-cdn-tos.bytecdntp.com/cdn/expire-1-M',
           'https://cdn.jsdelivr.net/npm',
           'https://cdn.jsdmirror.com/npm'
         ];
