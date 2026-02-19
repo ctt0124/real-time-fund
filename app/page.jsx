@@ -2476,6 +2476,8 @@ export default function HomePage() {
   const [scannedFunds, setScannedFunds] = useState([]); // 扫描到的基金
   const [selectedScannedCodes, setSelectedScannedCodes] = useState(new Set()); // 选中的扫描代码
   const [isScanning, setIsScanning] = useState(false);
+  const [isScanImporting, setIsScanImporting] = useState(false);
+  const [scanImportProgress, setScanImportProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 });
   const [scanProgress, setScanProgress] = useState({ stage: 'ocr', current: 0, total: 0 }); // stage: ocr | verify
   const abortScanRef = useRef(false); // 终止扫描标记
   const fileInputRef = useRef(null);
@@ -2658,60 +2660,58 @@ export default function HomePage() {
     });
   };
 
-  const confirmScanImport = () => {
+  const confirmScanImport = async () => {
     const codes = Array.from(selectedScannedCodes);
     if (codes.length === 0) {
       showToast('请至少选择一个基金代码', 'error');
       return;
     }
-    handleScanResult(codes);
     setScanConfirmModalOpen(false);
-    setScannedFunds([]);
-    setSelectedScannedCodes(new Set());
-  };
+    setIsScanImporting(true);
+    setScanImportProgress({ current: 0, total: codes.length, success: 0, failed: 0 });
 
-  const handleScanResult = (codes) => {
-    if (!codes || codes.length === 0) return;
-    // 如果只有一个代码，直接搜索
-    if (codes.length === 1) {
-      const code = codes[0];
-      setSearchTerm(code);
-      if (inputRef.current) inputRef.current.focus();
-      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-      searchTimeoutRef.current = setTimeout(() => performSearch(code), 300);
-    } else {
-      // 多个代码，直接批量添加
-      (async () => {
-        setLoading(true);
-        let successCount = 0;
+    try {
+      const newFunds = [];
+      let successCount = 0;
+      let failedCount = 0;
+
+      for (let i = 0; i < codes.length; i++) {
+        const code = codes[i];
+        setScanImportProgress(prev => ({ ...prev, current: i + 1 }));
+
+        if (funds.some(existing => existing.code === code)) continue;
         try {
-          const newFunds = [];
-          for (const code of codes) {
-             if (funds.some(existing => existing.code === code)) continue;
-             try {
-               const data = await fetchFundData(code);
-               newFunds.push(data);
-               successCount++;
-             } catch (e) {
-               console.error(`添加基金 ${code} 失败`, e);
-             }
-          }
-          if (newFunds.length > 0) {
-            const updated = dedupeByCode([...newFunds, ...funds]);
-            setFunds(updated);
-            storageHelper.setItem('funds', JSON.stringify(updated));
-            setSuccessModal({ open: true, message: `成功导入 ${successCount} 个基金` });
-          } else {
-             if (codes.length > 0 && successCount === 0) {
-                showToast('未找到有效基金或已存在', 'info');
-             }
-          }
+          const data = await fetchFundData(code);
+          newFunds.push(data);
+          successCount++;
+          setScanImportProgress(prev => ({ ...prev, success: prev.success + 1 }));
         } catch (e) {
-          showToast('批量导入失败', 'error');
-        } finally {
-          setLoading(false);
+          failedCount++;
+          setScanImportProgress(prev => ({ ...prev, failed: prev.failed + 1 }));
         }
-      })();
+      }
+
+      if (newFunds.length > 0) {
+        setFunds(prev => {
+          const updated = dedupeByCode([...newFunds, ...prev]);
+          storageHelper.setItem('funds', JSON.stringify(updated));
+          return updated;
+        });
+        setSuccessModal({ open: true, message: `成功导入 ${successCount} 个基金` });
+      } else {
+        if (codes.length > 0 && successCount === 0 && failedCount === 0) {
+          setSuccessModal({ open: true, message: '识别的基金已全部添加' });
+        } else {
+          showToast('未能导入任何基金', 'info');
+        }
+      }
+    } catch (e) {
+      showToast('导入失败', 'error');
+    } finally {
+      setIsScanImporting(false);
+      setScanImportProgress({ current: 0, total: 0, success: 0, failed: 0 });
+      setScannedFunds([]);
+      setSelectedScannedCodes(new Set());
     }
   };
 
@@ -5781,6 +5781,51 @@ export default function HomePage() {
               >
                 终止识别
               </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isScanImporting && (
+          <motion.div
+            className="modal-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-label="导入进度"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="glass card modal"
+              style={{ width: 320, maxWidth: '90vw', textAlign: 'center', padding: '24px' }}
+            >
+              <div style={{ marginBottom: 16 }}>
+                <div className="loading-spinner" style={{
+                  width: 40,
+                  height: 40,
+                  border: '3px solid var(--muted)',
+                  borderTopColor: 'var(--primary)',
+                  borderRadius: '50%',
+                  margin: '0 auto',
+                  animation: 'spin 1s linear infinite'
+                }} />
+              </div>
+              <div className="title" style={{ justifyContent: 'center', marginBottom: 8 }}>
+                正在导入基金…
+              </div>
+              {scanImportProgress.total > 0 && (
+                <div className="muted" style={{ marginBottom: 12 }}>
+                  进度 {scanImportProgress.current} / {scanImportProgress.total}
+                </div>
+              )}
+              <div className="muted" style={{ fontSize: 12, lineHeight: 1.6 }}>
+                成功 {scanImportProgress.success}，失败 {scanImportProgress.failed}
+              </div>
             </motion.div>
           </motion.div>
         )}
