@@ -90,7 +90,7 @@ export default function TransactionHistoryModal({
               {pendingTransactions.map((item) => (
                 <div key={item.id} style={{ background: 'rgba(230, 162, 60, 0.1)', border: '1px solid rgba(230, 162, 60, 0.2)', borderRadius: 8, padding: 12, marginBottom: 8 }}>
                   <div className="row" style={{ justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontWeight: 600, fontSize: '14px', color: item.type === 'buy' ? 'var(--danger)' : 'var(--success)' }}>
+                    <span style={{ fontWeight: 600, fontSize: '14px', color: item.type === 'buy' ? 'var(--primary)' : 'var(--danger)' }}>
                       {item.type === 'buy' ? '买入' : '卖出'}
                     </span>
                     <span className="muted" style={{ fontSize: '12px' }}>{item.date} {item.isAfter3pm ? '(15:00后)' : ''}</span>
@@ -123,7 +123,7 @@ export default function TransactionHistoryModal({
               sortedTransactions.map((item) => (
                 <div key={item.id} style={{ background: 'rgba(255, 255, 255, 0.05)', borderRadius: 8, padding: 12, marginBottom: 8 }}>
                   <div className="row" style={{ justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontWeight: 600, fontSize: '14px', color: item.type === 'buy' ? 'var(--danger)' : 'var(--success)' }}>
+                    <span style={{ fontWeight: 600, fontSize: '14px', color: item.type === 'buy' ? 'var(--primary)' : 'var(--danger)' }}>
                       {item.type === 'buy' ? '买入' : '卖出'}
                     </span>
                     <span className="muted" style={{ fontSize: '12px' }}>{item.date}</span>

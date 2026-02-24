@@ -85,10 +85,11 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
 
   // Red for up, Green for down (CN market style)
   // Hardcoded hex values from globals.css for Chart.js
-  const upColor = '#f87171'; // --danger
+  const upColor = '#f87171'; // --danger，与折线图红色一致
   const downColor = '#34d399'; // --success
   const lineColor = change >= 0 ? upColor : downColor;
-  
+  const primaryColor = typeof document !== 'undefined' ? (getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#22d3ee') : '#22d3ee';
+
   const chartData = useMemo(() => {
     // Calculate percentage change based on the first data point
     const firstValue = data.length > 0 ? data[0].value : 1;
@@ -141,7 +142,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
           data: buyPoints,
           borderColor: '#ffffff',
           borderWidth: 1,
-          backgroundColor: '#ef4444',
+          backgroundColor: primaryColor,
           pointStyle: 'circle',
           pointRadius: 2.5,
           pointHoverRadius: 4,
@@ -154,7 +155,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
           data: sellPoints,
           borderColor: '#ffffff',
           borderWidth: 1,
-          backgroundColor: '#22c55e',
+          backgroundColor: upColor,
           pointStyle: 'circle',
           pointRadius: 2.5,
           pointHoverRadius: 4,
@@ -163,7 +164,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
         }
       ]
     };
-  }, [data, lineColor, transactions]);
+  }, [data, lineColor, transactions, primaryColor]);
 
   const options = useMemo(() => {
     return {
@@ -268,13 +269,13 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
                   sellIndex = datasets[2].data.findIndex(v => v !== null && v !== undefined);
               }
               const isCollision = (firstBuyIndex === sellIndex);
-              drawPointLabel(1, firstBuyIndex, '买入', '#ef4444', '#ffffff', isCollision ? -20 : 0);
+              drawPointLabel(1, firstBuyIndex, '买入', primaryColor, '#ffffff', isCollision ? -20 : 0);
           }
       }
       if (datasets[2] && datasets[2].data) {
           const firstSellIndex = datasets[2].data.findIndex(v => v !== null && v !== undefined);
           if (firstSellIndex !== -1) {
-              drawPointLabel(2, firstSellIndex, '卖出', '#22c55e');
+              drawPointLabel(2, firstSellIndex, '卖出', '#f87171');
           }
       }
 
@@ -357,8 +358,8 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
             if (dsIndex > 0 && datasets[dsIndex]) {
                 const label = datasets[dsIndex].label;
                 // Determine background color based on dataset index
-                // 1 = Buy (Red), 2 = Sell (Green)
-                const bgColor = dsIndex === 1 ? '#ef4444' : '#22c55e';
+                // 1 = Buy (主题色), 2 = Sell (与折线图红色一致)
+                const bgColor = dsIndex === 1 ? primaryColor : '#f87171';
                 
                 // If collision, offset Buy label upwards
                 let yOffset = 0;

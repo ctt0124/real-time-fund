@@ -47,7 +47,7 @@ export default function HoldingActionModal({ fund, onClose, onAction, hasHistory
                 title="查看交易记录"
               >
                 <span>📜</span>
-                <span>记录</span>
+                <span>交易记录</span>
               </button>
             )}
           </div>

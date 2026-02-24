@@ -278,6 +278,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const timerRef = useRef(null);
+  const refreshCycleStartRef = useRef(Date.now());
   const refreshingRef = useRef(false);
   const isLoggingOutRef = useRef(false);
   const isExplicitLoginRef = useRef(false);
@@ -289,6 +290,8 @@ export default function HomePage() {
 
   // 全局刷新状态
   const [refreshing, setRefreshing] = useState(false);
+  // 刷新周期进度 0~1，用于环形进度条
+  const [refreshProgress, setRefreshProgress] = useState(0);
 
   // 收起/展开状态
   const [collapsedCodes, setCollapsedCodes] = useState(new Set());
@@ -1760,6 +1763,7 @@ export default function HomePage() {
   }, [userMenuOpen]);
 
   useEffect(() => {
+    refreshCycleStartRef.current = Date.now();
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
       const codes = Array.from(new Set(funds.map((f) => f.code)));
@@ -1769,6 +1773,17 @@ export default function HomePage() {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [funds, refreshMs]);
+
+  // 刷新进度条：每 100ms 更新一次进度
+  useEffect(() => {
+    if (funds.length === 0 || refreshMs <= 0) return;
+    const t = setInterval(() => {
+      const elapsed = Date.now() - refreshCycleStartRef.current;
+      const p = Math.min(1, elapsed / refreshMs);
+      setRefreshProgress(p);
+    }, 100);
+    return () => clearInterval(t);
+  }, [funds.length, refreshMs]);
 
   const performSearch = async (val) => {
     if (!val.trim()) {
@@ -1917,6 +1932,7 @@ export default function HomePage() {
     } finally {
       refreshingRef.current = false;
       setRefreshing(false);
+      refreshCycleStartRef.current = Date.now();
       try {
         await processPendingQueue();
       }catch (e) {
@@ -2945,7 +2961,7 @@ export default function HomePage() {
               <UpdateIcon width="14" height="14" />
             </div>
           )}
-          {!isMobile && <Image unoptimized alt="项目Github地址" src={githubImg} style={{ width: '30px', height: '30px', cursor: 'pointer' }} onClick={() => window.open("https://github.com/hzm0321/real-time-fund")} />}
+          <Image unoptimized alt="项目Github地址" src={githubImg} style={{ width: '30px', height: '30px', cursor: 'pointer' }} onClick={() => window.open("https://github.com/hzm0321/real-time-fund")} />
           {isMobile && (
             <button
               className="icon-button mobile-search-btn"
@@ -2959,20 +2975,22 @@ export default function HomePage() {
               </svg>
             </button>
           )}
-          <div className="badge" title="当前刷新频率">
-            <span>刷新</span>
-            <strong>{Math.round(refreshMs / 1000)}秒</strong>
-          </div>
-          <button
-            className="icon-button"
-            aria-label="立即刷新"
-            onClick={manualRefresh}
-            disabled={refreshing || funds.length === 0}
-            aria-busy={refreshing}
-            title="立即刷新"
+          <div
+            className="refresh-btn-wrap"
+            style={{ '--progress': refreshProgress }}
+            title={`刷新周期 ${Math.round(refreshMs / 1000)} 秒`}
           >
-            <RefreshIcon className={refreshing ? 'spin' : ''} width="18" height="18" />
-          </button>
+            <button
+              className="icon-button"
+              aria-label="立即刷新"
+              onClick={manualRefresh}
+              disabled={refreshing || funds.length === 0}
+              aria-busy={refreshing}
+              title="立即刷新"
+            >
+              <RefreshIcon className={refreshing ? 'spin' : ''} width="18" height="18" />
+            </button>
+          </div>
           {/*<button*/}
           {/*  className="icon-button"*/}
           {/*  aria-label="打开设置"*/}
@@ -3263,7 +3281,7 @@ export default function HomePage() {
                   holdings={holdings}
                   groupName={getGroupName()}
                   getProfit={getHoldingProfit}
-                  stickyTop={navbarHeight + filterBarHeight + (isMobile ? -2 : 0)}
+                  stickyTop={navbarHeight + filterBarHeight + (isMobile ? -14 : 0)}
                 />
 
               {currentTab !== 'all' && currentTab !== 'fav' && (
