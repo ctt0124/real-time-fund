@@ -824,24 +824,7 @@ export default function HomePage() {
 
   const handleAddHistory = (data) => {
     const fundCode = data.fundCode;
-    const current = holdings[fundCode] || { share: 0, cost: 0 };
-    const isBuy = data.type === 'buy';
-
-    let newShare, newCost;
-
-    if (isBuy) {
-      newShare = current.share + data.share;
-      // 加权平均成本
-      const buyCost = data.amount; // amount is total cost
-      newCost = (current.cost * current.share + buyCost) / newShare;
-    } else {
-      newShare = Math.max(0, current.share - data.share);
-      newCost = current.cost;
-      if (newShare === 0) newCost = 0;
-    }
-
-    handleSaveHolding(fundCode, { share: newShare, cost: newCost });
-
+    // 添加历史记录仅作补录展示，不修改真实持仓金额与份额
     setTransactions(prev => {
       const current = prev[fundCode] || [];
       const record = {
@@ -853,8 +836,9 @@ export default function HomePage() {
         date: data.date,
         isAfter3pm: false, // 历史记录通常不需要此标记，或者默认为 false
         isDca: false,
+        isHistoryOnly: true, // 仅记录，不参与持仓计算
         timestamp: data.timestamp || Date.now()
-      };
+      }
       // 按时间倒序排列
       const next = [record, ...current].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
       const nextState = { ...prev, [fundCode]: next };
@@ -3993,20 +3977,25 @@ export default function HomePage() {
                                       {(() => {
                                         const hasTodayData = f.jzrq === todayStr;
                                         let isYesterdayChange = false;
-                                        if (!hasTodayData && isString(f.gztime) && isString(f.jzrq)) {
-                                          const gzDate = toTz(f.gztime).startOf('day');
+                                        let isPreviousTradingDay = false;
+                                        if (!hasTodayData && isString(f.jzrq)) {
+                                          const today = toTz(todayStr).startOf('day');
                                           const jzDate = toTz(f.jzrq).startOf('day');
-                                          if (gzDate.clone().subtract(1, 'day').isSame(jzDate, 'day')) {
+                                          const yesterday = today.clone().subtract(1, 'day');
+                                          if (jzDate.isSame(yesterday, 'day')) {
                                             isYesterdayChange = true;
+                                          } else if (jzDate.isBefore(yesterday, 'day')) {
+                                            isPreviousTradingDay = true;
                                           }
                                         }
-                                        const shouldHideChange = isTradingDay && !hasTodayData && !isYesterdayChange;
+                                        const shouldHideChange = isTradingDay && !hasTodayData && !isYesterdayChange && !isPreviousTradingDay;
 
                                         if (shouldHideChange) return null;
 
+                                        const changeLabel = hasTodayData ? '涨跌幅' : (isYesterdayChange ? '昨日涨跌幅' : (isPreviousTradingDay ? '上一交易日涨跌幅' : '涨跌幅'));
                                         return (
                                           <Stat
-                                            label={isYesterdayChange ? '昨日涨跌幅' : '涨跌幅'}
+                                            label={changeLabel}
                                             value={f.zzl !== undefined ? `${f.zzl > 0 ? '+' : ''}${Number(f.zzl).toFixed(2)}%` : ''}
                                             delta={f.zzl}
                                           />
