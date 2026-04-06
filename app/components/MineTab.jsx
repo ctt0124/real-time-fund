@@ -80,7 +80,7 @@ export default function MineTab({
         </li>
         <li>
           <button type="button" className="mine-menu-row glass" onClick={onTutorial}>
-            <span className="mine-menu-label">使用教材</span>
+            <span className="mine-menu-label">使用帮助</span>
             <ChevronRight className="mine-menu-chevron" aria-hidden strokeWidth={2} />
           </button>
         </li>

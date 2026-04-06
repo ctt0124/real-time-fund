@@ -109,6 +109,8 @@ function SortableRow({ row, children, isTableDragging, disabled }) {
  * @param {boolean} [props.masked] - 是否隐藏持仓相关金额
  * @param {string} [props.relatedSectorSessionKey] - 登录用户 id（未登录传空），用于关联板块查询缓存与登录后重新拉取
  * @param {(items: { code: string; name?: string }[]) => void} [props.onBulkRemoveFundsConfirmed] - 批量删除二次确认后执行（与单条删除作用域一致）
+ * @param {(open: boolean) => void} [props.onFundCardDrawerOpenChange] - 基金详情底部 Drawer 打开/关闭时通知父级（用于隐藏底栏等）
+ * @param {(open: boolean) => void} [props.onMobileSettingModalOpenChange] - 移动端表格「个性化设置」弹框打开/关闭时通知父级（用于隐藏底栏等）
  */
 export default function MobileFundTable({
   data = [],
@@ -129,6 +131,8 @@ export default function MobileFundTable({
   masked = false,
   relatedSectorSessionKey = '',
   onBulkRemoveFundsConfirmed,
+  onFundCardDrawerOpenChange,
+  onMobileSettingModalOpenChange,
 }) {
   const [isNameSortMode, setIsNameSortMode] = useState(false);
   const [isBulkDeleteMode, setIsBulkDeleteMode] = useState(false);
@@ -339,6 +343,10 @@ export default function MobileFundTable({
   const [settingModalOpen, setSettingModalOpen] = useState(false);
 
   useEffect(() => {
+    onMobileSettingModalOpenChange?.(settingModalOpen);
+  }, [settingModalOpen, onMobileSettingModalOpenChange]);
+
+  useEffect(() => {
     if (sortBy !== 'default') setIsNameSortMode(false);
   }, [sortBy]);
 
@@ -355,6 +363,19 @@ export default function MobileFundTable({
   }, [isNameSortMode]);
 
   const [cardSheetRow, setCardSheetRow] = useState(null);
+
+  const fundCardDrawerOpen = !!(cardSheetRow && getFundCardProps);
+  useEffect(() => {
+    onFundCardDrawerOpenChange?.(fundCardDrawerOpen);
+  }, [fundCardDrawerOpen, onFundCardDrawerOpenChange]);
+
+  useEffect(() => {
+    return () => {
+      onFundCardDrawerOpenChange?.(false);
+      onMobileSettingModalOpenChange?.(false);
+    };
+  }, [onFundCardDrawerOpenChange, onMobileSettingModalOpenChange]);
+
   const tableContainerRef = useRef(null);
   const portalHeaderRef = useRef(null);
   const [tableContainerWidth, setTableContainerWidth] = useState(0);

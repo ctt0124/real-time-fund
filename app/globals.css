@@ -51,6 +51,24 @@
   --tabs-trigger-active-bg: rgba(34, 211, 238, 0.12);
   --tabs-trigger-active-text: var(--primary);
   --switch-thumb: var(--foreground);
+  /* 我的收益 Drawer：随主题切换，玻璃拟态 + 主色点缀（ui-ux-pro-max：层次、对比度、blur） */
+  --my-earnings-hero-text: var(--foreground);
+  --my-earnings-hero-muted: color-mix(in srgb, var(--foreground) 70%, transparent);
+  --my-earnings-card-bg: color-mix(in srgb, var(--card) 88%, var(--primary) 4%);
+  --my-earnings-card-border: var(--border);
+  --my-earnings-card-shadow: 0 16px 48px rgba(0, 0, 0, 0.42);
+  --my-earnings-calendar-accent: var(--primary);
+  --my-earnings-cell-faint: var(--muted-foreground);
+  --my-earnings-pill-bg: color-mix(in srgb, var(--primary) 14%, transparent);
+  --my-earnings-selected-bg: var(--primary);
+  --my-earnings-selected-fg: var(--primary-foreground);
+  --my-earnings-selected-shadow: 0 4px 18px color-mix(in srgb, var(--primary) 35%, transparent);
+  --my-earnings-dot-on-selected: var(--primary-foreground);
+  --my-earnings-hint-icon: var(--muted);
+  --my-earnings-card-fg: var(--card-foreground);
+  --my-earnings-cta-bg: var(--card);
+  --my-earnings-cta-text: var(--primary);
+  --my-earnings-cta-shadow: 0 4px 22px rgba(0, 0, 0, 0.22);
 }
 
 /* 亮色主题：ui-ux-pro-max 规范 - 正文 #0F172A、弱化 #475569、玻璃 bg-white/80+、边框可见 */
@@ -100,6 +118,13 @@
   --tabs-trigger-active-bg: rgba(8, 145, 178, 0.15);
   --tabs-trigger-active-text: var(--primary);
   --switch-thumb: var(--background);
+  --my-earnings-hero-text: var(--foreground);
+  --my-earnings-hero-muted: color-mix(in srgb, var(--foreground) 65%, transparent);
+  --my-earnings-card-bg: color-mix(in srgb, var(--card) 97%, transparent);
+  --my-earnings-card-shadow: 0 12px 36px rgba(37, 99, 235, 0.1), 0 4px 14px rgba(15, 23, 42, 0.06);
+  --my-earnings-pill-bg: color-mix(in srgb, var(--primary) 9%, transparent);
+  --my-earnings-selected-shadow: 0 4px 16px color-mix(in srgb, var(--primary) 28%, transparent);
+  --my-earnings-cta-shadow: 0 4px 16px rgba(8, 145, 178, 0.12);
 }
 
 * {
@@ -2036,6 +2061,458 @@ input[type="number"] {
   -webkit-overflow-scrolling: touch;
 }
 
+/* 我的收益：底部 Drawer（vaul），内容区滚动与主题变量 */
+.my-earnings-drawer-content {
+  max-width: 100%;
+}
+
+.my-earnings-drawer-inner {
+  color: var(--text);
+}
+
+.my-earnings-drawer-scroll {
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  -webkit-overflow-scrolling: touch;
+}
+
+.my-earnings-drawer-scroll .my-earnings-year-list {
+  max-height: none;
+  overflow: visible;
+}
+
+/* 与 MobileFundCardDrawer 一致：主标题在 DrawerHeader；以下为年月/视图上下文 */
+.my-earnings-context-header {
+  margin: 16px 0 0 0;
+}
+
+.my-earnings-title-row.my-earnings-period-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  position: relative;
+  padding-left: 0;
+}
+
+.my-earnings-period-row-single {
+  justify-content: center;
+}
+
+.my-earnings-period-label {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+.my-earnings-period-nav-btn {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    opacity 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.my-earnings-period-nav-btn:hover {
+  background: color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+.my-earnings-period-nav-btn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.my-earnings-period-nav-btn:active {
+  opacity: 0.88;
+}
+
+.my-earnings-period-nav-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.my-earnings-context-title {
+  margin-top: 15px;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text);
+}
+
+.my-earnings-swipe-wrap {
+  margin-bottom: 16px;
+}
+
+.my-earnings-calendar-card {
+  background: var(--my-earnings-card-bg);
+  border: 1px solid var(--my-earnings-card-border);
+  border-radius: 28px;
+  padding: 18px 14px 10px;
+  box-shadow: var(--my-earnings-card-shadow);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.my-earnings-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--my-earnings-calendar-accent);
+  margin-bottom: 10px;
+}
+
+.my-earnings-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px 2px;
+}
+
+.my-earnings-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 52px;
+  padding: 4px 2px 6px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--my-earnings-calendar-accent);
+  cursor: default;
+  transition: background 0.15s ease, color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.my-earnings-cell-outside {
+  color: var(--my-earnings-cell-faint);
+  font-weight: 500;
+}
+
+.my-earnings-cell-selected:not(:disabled) {
+  background: var(--my-earnings-selected-bg);
+  color: var(--my-earnings-selected-fg);
+  box-shadow: var(--my-earnings-selected-shadow);
+}
+
+.my-earnings-cell-selected:not(:disabled) .my-earnings-dot {
+  background: var(--my-earnings-dot-on-selected);
+}
+
+/* 按日视图：格内收益数字（正负着色与全站涨跌一致；字号由 FitText 在 10px～min 间缩放） */
+.my-earnings-cell-earnings {
+  display: block;
+  max-width: 100%;
+  padding: 0 1px;
+  overflow: hidden;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.my-earnings-drawer-content .my-earnings-cell-earnings.up {
+  color: var(--danger);
+}
+
+.my-earnings-drawer-content .my-earnings-cell-earnings.down {
+  color: var(--success);
+}
+
+.my-earnings-cell-earnings-zero {
+  color: var(--muted-foreground);
+}
+
+.my-earnings-cell-earnings-empty {
+  color: var(--muted-foreground);
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+.my-earnings-cell-selected:not(:disabled) .my-earnings-cell-num {
+  color: var(--my-earnings-selected-fg);
+}
+
+.my-earnings-cell-selected:not(:disabled) .my-earnings-cell-earnings.up {
+  color: #fecaca;
+}
+
+.my-earnings-cell-selected:not(:disabled) .my-earnings-cell-earnings.down {
+  color: #a7f3d0;
+}
+
+.my-earnings-cell-selected:not(:disabled) .my-earnings-cell-earnings-zero,
+.my-earnings-cell-selected:not(:disabled) .my-earnings-cell-earnings-empty {
+  color: rgba(255, 255, 255, 0.82);
+  opacity: 1;
+}
+
+.my-earnings-dot {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
+  border-radius: 50%;
+  background: var(--my-earnings-calendar-accent);
+}
+
+.my-earnings-dot-month {
+  position: static;
+  margin: 2px auto 0;
+}
+
+.my-earnings-cell-num {
+  line-height: 1.2;
+}
+
+.my-earnings-card-hint {
+  display: flex;
+  justify-content: center;
+  padding-top: 6px;
+  margin-top: 4px;
+}
+
+.my-earnings-card-hint-icon {
+  color: var(--my-earnings-hint-icon);
+  opacity: 0.85;
+}
+
+.my-earnings-month-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px 8px;
+  padding: 4px 0 8px;
+  min-width: 0;
+}
+
+.my-earnings-month-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+  text-align: center;
+  min-height: 64px;
+  padding: 8px 4px;
+  border-radius: 14px;
+  background: var(--my-earnings-pill-bg);
+  border: 1px solid color-mix(in srgb, var(--my-earnings-card-border) 70%, transparent);
+}
+
+/* 未到月份：仅月份标题，在格内垂直居中 */
+.my-earnings-month-cell:has(> :only-child) {
+  justify-content: center;
+}
+
+.my-earnings-month-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--my-earnings-calendar-accent);
+}
+
+/* align-self: stretch + min-width:0 让 FitText 占满格宽，大数字时才能按容器缩小字号 */
+.my-earnings-month-value {
+  align-self: stretch;
+  margin-top: 6px;
+  min-width: 0;
+  max-width: 100%;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--my-earnings-card-fg);
+}
+
+.my-earnings-drawer-content .my-earnings-month-value.up {
+  color: var(--danger);
+}
+
+.my-earnings-drawer-content .my-earnings-month-value.down {
+  color: var(--success);
+}
+
+.my-earnings-year-list {
+  max-height: min(48vh, 320px);
+  overflow-y: auto;
+  padding: 8px 4px 12px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.my-earnings-year-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 12px;
+  margin-bottom: 8px;
+  border-radius: 14px;
+  background: var(--my-earnings-pill-bg);
+  border: 1px solid color-mix(in srgb, var(--my-earnings-card-border) 70%, transparent);
+}
+
+.my-earnings-year-label {
+  flex-shrink: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--my-earnings-calendar-accent);
+}
+
+.my-earnings-year-amount {
+  min-width: 0;
+  flex: 1 1 0%;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--my-earnings-card-fg);
+}
+
+.my-earnings-drawer-content .my-earnings-year-amount.up {
+  color: var(--danger);
+}
+
+.my-earnings-drawer-content .my-earnings-year-amount.down {
+  color: var(--success);
+}
+
+.my-earnings-year-empty {
+  text-align: center;
+  color: var(--muted-foreground);
+  font-size: 14px;
+  padding: 24px 8px;
+  margin: 0;
+}
+
+.my-earnings-detail {
+  padding: 16px 4px 8px;
+  text-align: center;
+}
+
+/* 统计区在日历上方时的留白（与 period 行、日历卡片衔接） */
+.my-earnings-detail-summary-top {
+  padding-top: 0;
+  padding-bottom: 4px;
+  margin-bottom: 8px;
+}
+
+.my-earnings-detail-label {
+  font-size: 14px;
+  color: var(--my-earnings-hero-muted);
+  margin-bottom: 8px;
+}
+
+.my-earnings-detail-value {
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--my-earnings-hero-text);
+}
+
+.my-earnings-drawer-content .my-earnings-detail-value.up {
+  color: var(--danger);
+}
+
+.my-earnings-drawer-content .my-earnings-detail-value.down {
+  color: var(--success);
+}
+
+.my-earnings-detail-desc {
+  font-size: 14px;
+  color: var(--my-earnings-hero-muted);
+  margin: 0;
+}
+
+.my-earnings-detail-muted {
+  display: block;
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--my-earnings-hero-muted);
+}
+
+.my-earnings-empty {
+  text-align: center;
+  padding: 32px 12px 24px;
+}
+
+.my-earnings-empty-title {
+  margin: 0 0 12px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--my-earnings-hero-text);
+}
+
+.my-earnings-empty-desc {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--my-earnings-hero-muted);
+}
+
+.my-earnings-primary-btn {
+  margin-top: 22px;
+  width: 100%;
+  max-width: 280px;
+  padding: 14px 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--my-earnings-cta-text);
+  background: var(--my-earnings-cta-bg);
+  cursor: pointer;
+  box-shadow: var(--my-earnings-cta-shadow);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.2s ease,
+    filter 0.2s ease;
+}
+
+.my-earnings-primary-btn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.my-earnings-primary-btn:hover {
+  filter: brightness(1.03);
+}
+
+.my-earnings-primary-btn:active {
+  transform: scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .my-earnings-drawer-content .my-earnings-period-nav-btn,
+  .my-earnings-drawer-content .my-earnings-cell,
+  .my-earnings-drawer-content .trend-range-btn,
+  .my-earnings-drawer-content .my-earnings-primary-btn {
+    transition: none;
+  }
+
+  .my-earnings-primary-btn:active {
+    transform: none;
+  }
+}
+
 /* 移动端：首页底部留白（悬浮式底栏 + 安全区） */
 @media (max-width: 640px) {
   .content-with-mobile-tabbar {
@@ -2288,22 +2765,8 @@ input[type="number"] {
   box-sizing: border-box;
 }
 
-.mine-menu-row:hover {
-  border-color: var(--primary);
-  background: rgba(255, 255, 255, 0.06);
-}
-
 [data-theme="light"] .mine-menu-row {
   background: rgba(255, 255, 255, 0.5);
-}
-
-[data-theme="light"] .mine-menu-row:hover {
-  background: rgba(255, 255, 255, 0.85);
-}
-
-.mine-menu-row:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
 }
 
 .mine-menu-chevron {

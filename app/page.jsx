@@ -73,7 +73,7 @@ import PcFundTable from './components/PcFundTable';
 import MobileFundTable from './components/MobileFundTable';
 import MobileBottomNav from './components/MobileBottomNav';
 import MineTab from './components/MineTab';
-import PortfolioEarningsModal from './components/PortfolioEarningsModal';
+import MyEarningsCalendarPage from './components/MyEarningsCalendarPage';
 import { useFundFuzzyMatcher } from './hooks/useFundFuzzyMatcher';
 import {
   Select,
@@ -576,6 +576,23 @@ export default function HomePage() {
 
   const [mobileMainTab, setMobileMainTab] = useState('home');
   const [portfolioEarningsOpen, setPortfolioEarningsOpen] = useState(false);
+  const [mobileFundDrawerOpen, setMobileFundDrawerOpen] = useState(false);
+  const [mobileTableSettingModalOpen, setMobileTableSettingModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isMobile) {
+      setMobileFundDrawerOpen(false);
+      setMobileTableSettingModalOpen(false);
+    }
+  }, [isMobile]);
+
+  const handleFundCardDrawerOpenChange = useCallback((open) => {
+    setMobileFundDrawerOpen(Boolean(open));
+  }, []);
+
+  const handleMobileSettingModalOpenChange = useCallback((open) => {
+    setMobileTableSettingModalOpen(Boolean(open));
+  }, []);
 
   const shouldShowMarketIndex = isMobile ? showMarketIndexMobile : showMarketIndexPc;
 
@@ -4763,8 +4780,8 @@ export default function HomePage() {
     }
   };
 
-  useEffect(() => {
-    const isAnyModalOpen =
+  const isAnyModalOpen = useMemo(
+    () =>
       portfolioEarningsOpen ||
       feedbackOpen ||
       addResultOpen ||
@@ -4789,44 +4806,56 @@ export default function HomePage() {
       scanModalOpen ||
       scanConfirmModalOpen ||
       isScanning ||
-      isScanImporting;
+      isScanImporting ||
+      settingsOpen ||
+      sortSettingOpen ||
+      mobileFundDrawerOpen ||
+      mobileTableSettingModalOpen,
+    [
+      portfolioEarningsOpen,
+      feedbackOpen,
+      addResultOpen,
+      addFundToGroupOpen,
+      groupManageOpen,
+      groupModalOpen,
+      successModal.open,
+      cloudConfigModal.open,
+      logoutConfirmOpen,
+      holdingModal.open,
+      actionModal.open,
+      tradeModal.open,
+      dcaModal.open,
+      addHistoryModal.open,
+      historyModal.open,
+      loginModalOpen,
+      clearConfirm,
+      donateOpen,
+      fundDeleteConfirm,
+      updateModalOpen,
+      weChatOpen,
+      scanModalOpen,
+      scanConfirmModalOpen,
+      isScanning,
+      isScanImporting,
+      settingsOpen,
+      sortSettingOpen,
+      mobileFundDrawerOpen,
+      mobileTableSettingModalOpen,
+    ]
+  );
 
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
     if (isAnyModalOpen) {
-      containerRef.current.style.overflow = 'hidden';
+      el.style.overflow = 'hidden';
     } else {
-      containerRef.current.style.overflow = '';
+      el.style.overflow = '';
     }
-
     return () => {
-      containerRef.current.style.overflow = '';
+      if (containerRef.current) containerRef.current.style.overflow = '';
     };
-  }, [
-    portfolioEarningsOpen,
-    feedbackOpen,
-    addResultOpen,
-    addFundToGroupOpen,
-    groupManageOpen,
-    groupModalOpen,
-    successModal.open,
-    cloudConfigModal.open,
-    logoutConfirmOpen,
-    holdingModal.open,
-    actionModal.open,
-    tradeModal.open,
-    dcaModal.open,
-    addHistoryModal.open,
-    historyModal.open,
-    loginModalOpen,
-    clearConfirm,
-    donateOpen,
-    fundDeleteConfirm,
-    updateModalOpen,
-    weChatOpen,
-    scanModalOpen,
-    scanConfirmModalOpen,
-    isScanning,
-    isScanImporting
-  ]);
+  }, [isAnyModalOpen]);
 
   useEffect(() => {
     const onKey = (ev) => {
@@ -5610,6 +5639,8 @@ export default function HomePage() {
                           );
                         }}
                         onCustomSettingsChange={triggerCustomSettingsSync}
+                        onFundCardDrawerOpenChange={handleFundCardDrawerOpenChange}
+                        onMobileSettingModalOpenChange={handleMobileSettingModalOpenChange}
                         getFundCardProps={(row) => {
                           const fund = row?.rawFund || (row ? { code: row.code, name: row.fundName } : null);
                           if (!fund) return {};
@@ -5816,7 +5847,7 @@ export default function HomePage() {
           onSponsorSupport={() => setDonateOpen(true)}
         />
       )}
-      {isMobile && (
+      {isMobile && !isAnyModalOpen && (
         <MobileBottomNav value={mobileMainTab} onChange={setMobileMainTab} />
       )}
 
@@ -5830,21 +5861,16 @@ export default function HomePage() {
           />
         )}
       </AnimatePresence>
-      <AnimatePresence>
-        {portfolioEarningsOpen && (
-          <PortfolioEarningsModal
-            key="portfolio-earnings"
-            onClose={() => setPortfolioEarningsOpen(false)}
-            series={portfolioDailySeries}
-            theme={theme}
-            masked={maskAmounts}
-            onGoHome={() => {
-              setPortfolioEarningsOpen(false);
-              setMobileMainTab('home');
-            }}
-          />
-        )}
-      </AnimatePresence>
+      <MyEarningsCalendarPage
+        open={portfolioEarningsOpen}
+        onOpenChange={setPortfolioEarningsOpen}
+        series={portfolioDailySeries}
+        masked={maskAmounts}
+        onGoHome={() => {
+          setPortfolioEarningsOpen(false);
+          setMobileMainTab('home');
+        }}
+      />
       <AnimatePresence>
         {weChatOpen && (
             <WeChatModal onClose={() => setWeChatOpen(false)} />
