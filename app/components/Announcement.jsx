@@ -76,7 +76,7 @@ export default function Announcement() {
             </div>
             <div style={{ color: 'var(--text)', lineHeight: '1.6', fontSize: '15px', overflowY: 'auto', minHeight: 0, flex: 1, paddingRight: '4px' }}>
               <p>v1.0.2 更新内容如下：</p>
-              <p>1. 新增分组搜索功能。</p>
+              <p>1. 新增分组搜索功能（可通过全局设置关闭）。</p>
               <p>2. 交易记录弹框新增数据合并按钮（如果自定义分组交易数据缺失，可点击数据合并按钮进行合并）。</p>
               <p>3. 调整默认列排序。</p>
               <br/>
