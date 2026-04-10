@@ -35,8 +35,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { DragIcon, SettingsIcon, StarIcon, TrashIcon, ResetIcon } from './Icons';
+import { DragIcon, SettingsIcon, StarIcon, TrashIcon, ResetIcon, FolderPlusIcon } from './Icons';
 import { fetchFundPeriodReturns, fetchRelatedSectors, fetchRelatedSectorLiveQuote } from '@/app/api/fund';
+import MoveGroupModal from './MoveGroupModal';
 
 const NON_FROZEN_COLUMN_IDS = [
   'relatedSector',
@@ -169,7 +170,9 @@ export default function PcFundTable({
   data = [],
   onRemoveFund,
   onRemoveFunds,
+  onMoveFunds,
   currentTab,
+  groups = [],
   favorites = new Set(),
   onToggleFavorite,
   onHoldingAmountClick,
@@ -236,6 +239,7 @@ export default function PcFundTable({
     [data],
   );
   const [selectedCodes, setSelectedCodes] = useState(() => new Set());
+  const [moveGroupOpen, setMoveGroupOpen] = useState(false);
 
   useEffect(() => {
     setSelectedCodes(new Set());
@@ -285,6 +289,7 @@ export default function PcFundTable({
   }, [selectableCodes]);
 
   const selectedCount = selectedCodes?.size || 0;
+  const selectedCodesList = useMemo(() => Array.from(selectedCodes || []), [selectedCodes]);
 
   const getCustomSettingsWithMigration = () => {
     if (typeof window === 'undefined') return {};
@@ -876,6 +881,10 @@ export default function PcFundTable({
                 const codes = Array.from(selectedCodes);
                 const shouldClear = onRemoveFunds(codes);
                 if (shouldClear !== false) setSelectedCodes(new Set());
+              }}
+              onMove={() => {
+                if (!onMoveFunds || selectedCount === 0) return;
+                setMoveGroupOpen(true);
               }}
               disabled={refreshing || selectedCount === 0}
             />
@@ -1476,6 +1485,7 @@ export default function PcFundTable({
       selectedCount,
       selectedCodes,
       onRemoveFunds,
+      onMoveFunds,
       setAllSelected,
       toggleSelected,
     ],
@@ -1984,6 +1994,23 @@ export default function PcFundTable({
         showFullFundName={showFullFundName}
         onToggleShowFullFundName={handleToggleShowFullFundName}
       />
+      {moveGroupOpen && (
+        <MoveGroupModal
+          open={moveGroupOpen}
+          onClose={() => setMoveGroupOpen(false)}
+          fromTab={currentTab}
+          groups={groups}
+          selectedCodes={selectedCodesList}
+          disabled={refreshing || selectedCount === 0}
+          onMoveFunds={async (payload) => {
+            const res = await onMoveFunds?.(payload);
+            if (payload?.dryRun) return res;
+            // 迁移成功后清空批量选中
+            setSelectedCodes(new Set());
+            return res;
+          }}
+        />
+      )}
     </>
 
   );
@@ -2024,6 +2051,7 @@ function BatchRemoveHeader({
   selectedCount,
   totalCount,
   onToggleAll,
+  onMove,
   onRemove,
   onClear,
   disabled,
@@ -2066,29 +2094,54 @@ function BatchRemoveHeader({
         )}
       </div>
 
-      <button
-        className="icon-button"
-        onClick={(e) => { e.stopPropagation?.(); onRemove?.(); }}
-        title="批量删除"
-        disabled={!!disabled}
-        type="button"
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 6,
-          padding: '0 10px',
-          height: 28,
-          width: 'auto',
-          opacity: disabled ? 0.6 : 1,
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          backgroundColor: 'transparent',
-          border: 'none',
-          color: 'var(--danger)'
-        }}
-      >
-        <TrashIcon width="14" height="14" />
-        <span style={{ fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>批量删除</span>
-      </button>
+      <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+        <button
+          className="icon-button"
+          onClick={(e) => { e.stopPropagation?.(); onMove?.(); }}
+          title="移动分组"
+          disabled={!!disabled}
+          type="button"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            padding: '0 6px',
+            height: 28,
+            width: 'auto',
+            opacity: disabled ? 0.6 : 1,
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            backgroundColor: 'transparent',
+            border: 'none',
+            color: 'var(--primary)'
+          }}
+        >
+          <FolderPlusIcon width="14" height="14" />
+          <span style={{ fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>移动分组</span>
+        </button>
+        <button
+          className="icon-button"
+          onClick={(e) => { e.stopPropagation?.(); onRemove?.(); }}
+          title="批量删除"
+          disabled={!!disabled}
+          type="button"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            padding: '0 6px',
+            height: 28,
+            width: 'auto',
+            opacity: disabled ? 0.6 : 1,
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            backgroundColor: 'transparent',
+            border: 'none',
+            color: 'var(--danger)'
+          }}
+        >
+          <TrashIcon width="14" height="14" />
+          <span style={{ fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>批量删除</span>
+        </button>
+      </div>
     </div>
   );
 }

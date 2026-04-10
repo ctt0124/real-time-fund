@@ -3863,6 +3863,210 @@ export default function HomePage() {
     return true;
   };
 
+  /**
+   * 批量迁移分组（含持仓/交易/待处理/定投等分组作用域数据）
+   *
+   * - fromTab: 'all' | 'fav' | groupId
+   * - targetId: 'all' | groupId
+   * - dryRun: 仅检测目标是否存在持仓数据冲突
+   * - overwrite: 冲突时是否覆盖目标持仓数据
+   */
+  const handleMoveFunds = async ({ codes, fromTab, targetId, dryRun = false, overwrite = false } = {}) => {
+    const list = Array.from(new Set((codes || []).filter(Boolean)));
+    if (list.length === 0) return { conflicts: [] };
+
+    const isCustomTab = (tab) => tab && tab !== 'all' && tab !== 'fav' && groups.some((g) => g?.id === tab);
+    const fromGid = isCustomTab(fromTab) ? fromTab : null;
+    const toGid = targetId && targetId !== 'all' ? targetId : null;
+
+    if (targetId === 'all') {
+      if (!fromGid) return { conflicts: [] };
+    } else {
+      if (!toGid || !groups.some((g) => g?.id === toGid)) return { conflicts: [] };
+      if (toGid === fromGid) return { conflicts: [] };
+    }
+
+    const conflicts = [];
+    for (const code of list) {
+      const hasTargetHolding = toGid
+        ? (groupHoldings?.[toGid]?.[code] != null)
+        : (holdings?.[code] != null);
+      if (hasTargetHolding) conflicts.push(code);
+    }
+    if (dryRun) return { conflicts };
+    if (!overwrite && conflicts.length > 0) return { conflicts };
+
+    // 1) groups.codes：维护基金所属分组（仅自定义分组）
+    if (fromGid || toGid) {
+      setGroups((prev) => {
+        const next = (prev || []).map((g) => {
+          if (!g?.id) return g;
+          if (fromGid && g.id === fromGid) {
+            return { ...g, codes: (g.codes || []).filter((c) => !list.includes(c)) };
+          }
+          if (toGid && g.id === toGid) {
+            return { ...g, codes: Array.from(new Set([...(g.codes || []), ...list])) };
+          }
+          return g;
+        });
+        storageHelper.setItem('groups', JSON.stringify(next));
+        return next;
+      });
+    }
+
+    // 2) holdings / groupHoldings：迁移持仓（支持覆盖确认）
+    setHoldings((prev) => {
+      const next = { ...(prev || {}) };
+
+      // all/fav -> group：从 global holdings 移出（目标持仓写入 groupHoldings）
+      if (!fromGid && toGid) {
+        for (const code of list) delete next[code];
+        storageHelper.setItem('holdings', JSON.stringify(next));
+        return next;
+      }
+
+      // group -> all：从 groupHoldings 写入 global holdings（并在 groupHoldings 中移除）
+      if (fromGid && !toGid) {
+        const fromBucket = groupHoldings?.[fromGid] || {};
+        let changed = false;
+        for (const code of list) {
+          const fromValue = fromBucket?.[code];
+          if (fromValue === undefined) continue;
+          if (overwrite || next[code] == null) {
+            next[code] = cloneHoldingDeep(fromValue) ?? fromValue;
+            changed = true;
+          }
+        }
+        if (!changed) return prev;
+        storageHelper.setItem('holdings', JSON.stringify(next));
+        return next;
+      }
+
+      // group<->group：global holdings 不参与
+      return prev;
+    });
+
+    setGroupHoldings((prev) => {
+      const next = { ...(prev || {}) };
+      const getBucket = (gid) => (next[gid] && typeof next[gid] === 'object' ? { ...next[gid] } : {});
+
+      // 读取源持仓
+      const sourceBucket = fromGid ? getBucket(fromGid) : null;
+      const targetBucket = toGid ? getBucket(toGid) : null;
+
+      if (toGid) next[toGid] = targetBucket;
+      if (fromGid) next[fromGid] = sourceBucket;
+
+      for (const code of list) {
+        const fromValue = fromGid
+          ? sourceBucket?.[code]
+          : holdings?.[code];
+
+        // 写入目标（仅在目标为自定义分组时）
+        if (toGid) {
+          if (overwrite || targetBucket?.[code] == null) {
+            targetBucket[code] = cloneHoldingDeep(fromValue) ?? fromValue ?? null;
+          }
+        }
+
+        // 移除源分组持仓（仅源为自定义分组时；all/fav -> group 的源在 setHoldings 中删）
+        if (fromGid && sourceBucket && code in sourceBucket) {
+          delete sourceBucket[code];
+        }
+      }
+
+      storageHelper.setItem('groupHoldings', JSON.stringify(next));
+      return next;
+    });
+
+    // 3) pendingTrades：迁移待处理队列（通过 groupId 归属作用域）
+    setPendingTrades((prev) => {
+      let changed = false;
+      const next = (prev || []).map((t) => {
+        if (!t?.fundCode) return t;
+        if (!list.includes(t.fundCode)) return t;
+        const inFromScope = fromGid ? t.groupId === fromGid : !t.groupId;
+        if (!inFromScope) return t;
+        changed = true;
+        if (toGid) return { ...t, groupId: toGid };
+        const { groupId, ...rest } = t;
+        return rest;
+      });
+      if (!changed) return prev;
+      storageHelper.setItem('pendingTrades', JSON.stringify(next));
+      return next;
+    });
+
+    // 4) transactions：迁移交易记录（通过 groupId 归属作用域）
+    setTransactions((prev) => {
+      const out = { ...(prev || {}) };
+      let changed = false;
+      for (const code of list) {
+        const arr = out?.[code];
+        if (!Array.isArray(arr) || arr.length === 0) continue;
+        const nextArr = arr.map((tx) => {
+          if (!tx) return tx;
+          const inFromScope = fromGid ? tx.groupId === fromGid : !tx.groupId;
+          if (!inFromScope) return tx;
+          changed = true;
+          if (toGid) return { ...tx, groupId: toGid };
+          const { groupId, ...rest } = tx;
+          return rest;
+        });
+        out[code] = nextArr;
+      }
+      if (!changed) return prev;
+      storageHelper.setItem('transactions', JSON.stringify(out));
+      return out;
+    });
+
+    // 5) dcaPlans：迁移定投计划（按 scope 分桶）
+    setDcaPlans((prev) => {
+      const scoped = migrateDcaPlansToScoped(prev);
+      const fromKey = fromGid || DCA_SCOPE_GLOBAL;
+      const toKey = toGid || DCA_SCOPE_GLOBAL;
+      const fromBucket = scoped[fromKey] && typeof scoped[fromKey] === 'object' ? { ...scoped[fromKey] } : {};
+      const toBucket = scoped[toKey] && typeof scoped[toKey] === 'object' ? { ...scoped[toKey] } : {};
+      let changed = false;
+      for (const code of list) {
+        if (fromBucket[code] === undefined) continue;
+        toBucket[code] = fromBucket[code];
+        delete fromBucket[code];
+        changed = true;
+      }
+      if (!changed) return prev;
+      const nextScoped = { ...scoped, [fromKey]: fromBucket, [toKey]: toBucket };
+      storageHelper.setItem('dcaPlans', JSON.stringify(nextScoped));
+      return nextScoped;
+    });
+
+    // 6) fundDailyEarnings：每日收益序列（按 scope 分桶：all + 自定义分组 id）
+    setFundDailyEarnings((prev) => {
+      const fromKey = fromGid || DAILY_EARNINGS_SCOPE_ALL;
+      const toKey = toGid || DAILY_EARNINGS_SCOPE_ALL;
+      const base = isPlainObject(prev) ? prev : {};
+      const fromBucket = isPlainObject(base[fromKey]) ? { ...base[fromKey] } : {};
+      const toBucket = isPlainObject(base[toKey]) ? { ...base[toKey] } : {};
+      let changed = false;
+      for (const code of list) {
+        if (!(code in fromBucket)) continue;
+        if (!overwrite && (code in toBucket)) continue;
+        toBucket[code] = fromBucket[code];
+        delete fromBucket[code];
+        changed = true;
+      }
+      if (!changed) return prev;
+      const next = { ...base, [fromKey]: fromBucket, [toKey]: toBucket };
+      storageHelper.setItem('fundDailyEarnings', JSON.stringify(next));
+      return next;
+    });
+
+    // 迁移成功后切换到目标分组
+    setCurrentTab(targetId === 'all' ? 'all' : targetId);
+    showToast('分组迁移完成', 'success');
+    return { conflicts: [] };
+  };
+
   const addFund = async (e) => {
     e?.preventDefault?.();
     setError('');
@@ -6215,11 +6419,13 @@ export default function HomePage() {
                                 relatedSectorSessionKey={user?.id ?? ''}
                                 refreshing={refreshing}
                                 currentTab={currentTab}
+                                groups={groups}
                                 favorites={favorites}
                                 sortBy={sortBy}
                                 onReorder={handleReorder}
                                 onRemoveFund={handleRemoveFundRow}
                                 onRemoveFunds={(codes) => requestRemoveFundsFromCurrentGroup(codes)}
+                                onMoveFunds={handleMoveFunds}
                                 batchSelectionClearRef={pcBatchClearSelectionRef}
                                 onToggleFavorite={handleToggleFavoriteRow}
                                 onHoldingAmountClick={handleHoldingAmountClickRow}
