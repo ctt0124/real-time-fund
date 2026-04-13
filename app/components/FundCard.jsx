@@ -119,6 +119,9 @@ export default function FundCard({
     ? `${relatedSectorPctValue > 0 ? '+' : ''}${relatedSectorPctValue.toFixed(2)}%`
     : '';
 
+  const holdingLocked = (currentTab === 'all' || currentTab === 'fav') && isHoldingLinked;
+  const holdingLockedTitle = '持仓来自自定义分组汇总，无法在「全部/自选」设置持仓金额';
+
   const style = layoutMode === 'drawer' ? {
     border: 'none',
     boxShadow: 'none',
@@ -321,25 +324,37 @@ export default function FundCard({
                 display: 'flex',
                 alignItems: 'center',
                 gap: 4,
-                cursor: 'pointer',
+                cursor: holdingLocked ? 'not-allowed' : 'pointer',
               }}
-              onClick={() => onHoldingClick?.(f)}
+              title={holdingLocked ? holdingLockedTitle : '设置持仓'}
+              onClick={() => {
+                if (holdingLocked) return;
+                onHoldingClick?.(f);
+              }}
             >
-              未设置  <SettingsIcon width="12" height="12" />
+              未设置 {holdingLocked ? null : <SettingsIcon width="12" height="12" />}
             </div>
           </div>
         ) : (
           <>
             <div
               className="stat"
-              style={{ cursor: 'pointer', flexDirection: 'column', gap: 4 }}
-              onClick={() => onActionClick?.(f)}
+              style={{
+                cursor: holdingLocked ? 'not-allowed' : 'pointer',
+                flexDirection: 'column',
+                gap: 4,
+              }}
+              title={holdingLocked ? holdingLockedTitle : '点击设置持仓'}
+              onClick={() => {
+                if (holdingLocked) return;
+                onActionClick?.(f);
+              }}
             >
               <span
                 className="label"
                 style={{ display: 'flex', alignItems: 'center', gap: 4 }}
               >
-                持仓金额 <SettingsIcon width="12" height="12" style={{ opacity: 0.7 }} />
+                持仓金额 {holdingLocked ? null : <SettingsIcon width="12" height="12" style={{ opacity: 0.7 }} />}
               </span>
               <span className="value">
                 {masked ? '******' : `${profit.amount.toFixed(2)}`}

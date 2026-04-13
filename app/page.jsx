@@ -45,6 +45,7 @@ import {
   UpdateIcon,
   UserIcon,
   CameraIcon,
+  FolderPlusIcon,
 } from "./components/Icons";
 import AddFundToGroupModal from "./components/AddFundToGroupModal";
 import AddResultModal from "./components/AddResultModal";
@@ -552,6 +553,12 @@ export default function HomePage() {
   const [dcaModal, setDcaModal] = useState({ open: false, fund: null });
   const [clearConfirm, setClearConfirm] = useState(null); // { fund }
   const [donateOpen, setDonateOpen] = useState(false);
+  const [holdingMigrateDialog, setHoldingMigrateDialog] = useState({
+    open: false,
+    code: null,
+    name: '',
+    targetGroupId: null,
+  });
   const [holdings, setHoldings] = useState({}); // { [code]: { share: number, cost: number } }
   /** 自定义分组独立持仓：groupId -> code -> holding */
   const [groupHoldings, setGroupHoldings] = useState({});
@@ -6140,6 +6147,25 @@ export default function HomePage() {
       showToast('该基金持仓来自自定义分组汇总，无法在「全部/自选」设置持仓金额', 'info');
       return;
     }
+
+    // 自定义分组：未设置持仓时，如果“全部”存在全局持仓，则提示迁移
+    if (activeGroupId && meta?.hasHolding === false) {
+      const gh = groupHoldings?.[activeGroupId]?.[row.code];
+      const hasGroupShare = gh && isNumber(gh.share) && gh.share > 0;
+      const global = holdings?.[row.code];
+      const hasGlobalShare = global && isNumber(global.share) && global.share > 0;
+      if (!hasGroupShare && hasGlobalShare) {
+        const name = row.rawFund?.name ?? row.fundName ?? row.code;
+        setHoldingMigrateDialog({
+          open: true,
+          code: row.code,
+          name,
+          targetGroupId: activeGroupId,
+        });
+        return;
+      }
+    }
+
     const fund = row.rawFund || { code: row.code, name: row.fundName };
     if (meta?.hasHolding) {
       setActionModal({ open: true, fund });
@@ -6160,6 +6186,25 @@ export default function HomePage() {
       showToast('该基金持仓来自自定义分组汇总，无法在「全部/自选」设置持仓金额', 'info');
       return;
     }
+
+    // 自定义分组：卡片视图/抽屉中“未设置持仓”点击时也走同样迁移提示
+    if (activeGroupId && code) {
+      const gh = groupHoldings?.[activeGroupId]?.[code];
+      const hasGroupShare = gh && isNumber(gh.share) && gh.share > 0;
+      const global = holdings?.[code];
+      const hasGlobalShare = global && isNumber(global.share) && global.share > 0;
+      if (!hasGroupShare && hasGlobalShare) {
+        const name = fund?.name ?? code;
+        setHoldingMigrateDialog({
+          open: true,
+          code,
+          name,
+          targetGroupId: activeGroupId,
+        });
+        return;
+      }
+    }
+
     setHoldingModal({ open: true, fund });
   }, [currentTab, linkedHoldingsForAllFav, showToast]);
   const openActionModal = useCallback((fund) => setActionModal({ open: true, fund }), []);
@@ -7486,6 +7531,46 @@ export default function HomePage() {
               if (!f) return;
               setHoldingModal({ open: false, fund: null });
               setTradeModal({ open: true, fund: f, type: 'buy' });
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {holdingMigrateDialog.open && (
+          <ConfirmModal
+            title="提示"
+            messageContent={
+              <div>
+                {holdingMigrateDialog.name || holdingMigrateDialog.code || '该基金'}
+                在全部分组中存在持仓数据，请在全部分组清空该基金持仓或迁移数据到本分组。
+              </div>
+            }
+            icon={<FolderPlusIcon width="20" height="20" className="shrink-0 text-[var(--primary)]" />}
+            confirmVariant="primary"
+            confirmText="迁移数据到本分组"
+            onCancel={() => setHoldingMigrateDialog({ open: false, code: null, name: '', targetGroupId: null })}
+            onConfirm={async () => {
+              const code = holdingMigrateDialog.code;
+              const gid = holdingMigrateDialog.targetGroupId;
+              if (!code || !gid) {
+                setHoldingMigrateDialog({ open: false, code: null, name: '', targetGroupId: null });
+                return;
+              }
+              try {
+                await handleMoveFunds({
+                  codes: [code],
+                  fromTab: 'all',
+                  targetId: gid,
+                  overwrite: true,
+                });
+                showToast('已迁移持仓数据到本分组', 'success');
+              } catch (e) {
+                console.warn('迁移持仓失败', e);
+                showToast('迁移失败，请稍后再试', 'error');
+              } finally {
+                setHoldingMigrateDialog({ open: false, code: null, name: '', targetGroupId: null });
+              }
             }}
           />
         )}
