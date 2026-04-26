@@ -5840,6 +5840,12 @@ export default function HomePage() {
         try {
           const merged = { ...(customSettings || {}), ...cloudData.customSettings };
           setCustomSettings(merged);
+          if (
+            typeof merged.localSortDisplayMode === 'string' &&
+            SORT_DISPLAY_MODES.has(merged.localSortDisplayMode)
+          ) {
+            setSortDisplayMode(merged.localSortDisplayMode);
+          }
         } catch { }
       }
 
