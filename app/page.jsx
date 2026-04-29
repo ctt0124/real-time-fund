@@ -4141,6 +4141,9 @@ export default function HomePage() {
     };
 
     try {
+      const now = nowInTz();
+      const isTradingTime = isDateTradingDay(now) && now.hour() >= 9 && now.hour() < 15;
+
       const updated = [];
       const dailyChanges = {}; // 存储待更新的每日收益 { [scope]: { [code]: nextList } }
       let earningsChanged = false;
@@ -4275,101 +4278,104 @@ export default function HomePage() {
         }
 
         // 【步骤 3.3】收益补齐逻辑：检查本地历史收益记录，如有缺失则根据持仓和历史净值进行追溯计算
-        try {
-          const targetScopes = [];
-          if (holdings[data.code] && isNumber(holdings[data.code].share) && holdings[data.code].share > 0) {
-            targetScopes.push(DAILY_EARNINGS_SCOPE_ALL);
-          }
-          Object.keys(groupHoldings || {}).forEach(gid => {
-            if (groupHoldings[gid]?.[data.code] && isNumber(groupHoldings[gid][data.code].share) && groupHoldings[gid][data.code].share > 0) {
-              targetScopes.push(gid);
+        // 优化：交易日 9:00 - 15:00 期间跳过历史收益计算逻辑，专注实时估值更新
+        if (!isTradingTime) {
+          try {
+            const targetScopes = [];
+            if (holdings[data.code] && isNumber(holdings[data.code].share) && holdings[data.code].share > 0) {
+              targetScopes.push(DAILY_EARNINGS_SCOPE_ALL);
             }
-          });
-
-          if (targetScopes.length === 0) return;
-
-          const latestNavDate = data.jzrq;
-          if (!isValidDateStr(latestNavDate)) return;
-
-          const navCache = new Map();
-
-          for (const scope of targetScopes) {
-            const h = scope === DAILY_EARNINGS_SCOPE_ALL ? holdings[data.code] : groupHoldings[scope][data.code];
-            const existing = dailyChanges[scope]?.[data.code] ||
-                             (fundDailyEarnings[scope] && Array.isArray(fundDailyEarnings[scope][data.code]) ? fundDailyEarnings[scope][data.code] : []);
-            const lastRecordedDate = existing.length ? existing[existing.length - 1]?.date : null;
-
-            const getEffectiveShare = (targetDate) => {
-              let baseShare = h.share;
-              const list = transactions[data.code] || [];
-              for (const tx of list) {
-                if (!tx || !tx.date || tx.date < targetDate) continue;
-                const gid = tx.groupId || null;
-                const txInScope = (scope === DAILY_EARNINGS_SCOPE_ALL) ? !gid : (gid === scope);
-                if (!txInScope) continue;
-                const s = Number(tx.share) || 0;
-                if (tx.type === 'buy') baseShare -= s;
-                else if (tx.type === 'sell') baseShare += s;
+            Object.keys(groupHoldings || {}).forEach(gid => {
+              if (groupHoldings[gid]?.[data.code] && isNumber(groupHoldings[gid][data.code].share) && groupHoldings[gid][data.code].share > 0) {
+                targetScopes.push(gid);
               }
-              return Math.max(0, baseShare);
-            };
+            });
 
-            if (!existing.length) {
-              const share = getEffectiveShare(latestNavDate);
-              if (share > 0) {
-                const v = calcLatestDayFromFund(data, share, h.cost);
-                if (v && Number.isFinite(v.earnings) && fundCodeStillInStorage(data.code)) {
-                  localRecordToChanges(scope, data.code, v.earnings, latestNavDate, v.rate);
+            if (targetScopes.length === 0) return;
+
+            const latestNavDate = data.jzrq;
+            if (!isValidDateStr(latestNavDate)) return;
+
+            const navCache = new Map();
+
+            for (const scope of targetScopes) {
+              const h = scope === DAILY_EARNINGS_SCOPE_ALL ? holdings[data.code] : groupHoldings[scope][data.code];
+              const existing = dailyChanges[scope]?.[data.code] ||
+                (fundDailyEarnings[scope] && Array.isArray(fundDailyEarnings[scope][data.code]) ? fundDailyEarnings[scope][data.code] : []);
+              const lastRecordedDate = existing.length ? existing[existing.length - 1]?.date : null;
+
+              const getEffectiveShare = (targetDate) => {
+                let baseShare = h.share;
+                const list = transactions[data.code] || [];
+                for (const tx of list) {
+                  if (!tx || !tx.date || tx.date < targetDate) continue;
+                  const gid = tx.groupId || null;
+                  const txInScope = (scope === DAILY_EARNINGS_SCOPE_ALL) ? !gid : (gid === scope);
+                  if (!txInScope) continue;
+                  const s = Number(tx.share) || 0;
+                  if (tx.type === 'buy') baseShare -= s;
+                  else if (tx.type === 'sell') baseShare += s;
                 }
-              }
-              if (!(dailyChanges[scope] && dailyChanges[scope][data.code])) {
-                try {
-                  const nav = Number(data.dwjz);
-                  if (Number.isFinite(nav) && nav > 0) {
-                    navCache.set(latestNavDate, nav);
-                    const prevNav = await findPrevTradingNav(data.code, latestNavDate, navCache, data);
-                    const share = getEffectiveShare(latestNavDate);
-                    if (fundCodeStillInStorage(data.code) && Number.isFinite(prevNav) && prevNav > 0 && share > 0) {
+                return Math.max(0, baseShare);
+              };
+
+              if (!existing.length) {
+                const share = getEffectiveShare(latestNavDate);
+                if (share > 0) {
+                  const v = calcLatestDayFromFund(data, share, h.cost);
+                  if (v && Number.isFinite(v.earnings) && fundCodeStillInStorage(data.code)) {
+                    localRecordToChanges(scope, data.code, v.earnings, latestNavDate, v.rate);
+                  }
+                }
+                if (!(dailyChanges[scope] && dailyChanges[scope][data.code])) {
+                  try {
+                    const nav = Number(data.dwjz);
+                    if (Number.isFinite(nav) && nav > 0) {
+                      navCache.set(latestNavDate, nav);
+                      const prevNav = await findPrevTradingNav(data.code, latestNavDate, navCache, data);
+                      const share = getEffectiveShare(latestNavDate);
+                      if (fundCodeStillInStorage(data.code) && Number.isFinite(prevNav) && prevNav > 0 && share > 0) {
+                        const earnings = calcEarningsFromNavs(nav, prevNav, share);
+                        const rate = calcRateFromNavs(nav, prevNav, h.cost);
+                        if (Number.isFinite(earnings)) {
+                          localRecordToChanges(scope, data.code, earnings, latestNavDate, rate);
+                        }
+                      }
+                    }
+                  } catch { }
+                }
+              } else if (isValidDateStr(lastRecordedDate) && lastRecordedDate < latestNavDate) {
+                const latestNav = Number(data.dwjz);
+                if (Number.isFinite(latestNav) && latestNav > 0) navCache.set(latestNavDate, latestNav);
+
+                const start = addDays(lastRecordedDate, 1);
+                const navRows = await fetchFundNetValueRange(data.code, lastRecordedDate, latestNavDate);
+                if (fundCodeStillInStorage(data.code)) {
+                  for (const r of navRows) navCache.set(r.date, r.nav);
+                  const firstIdx = navRows.findIndex((r) => r.date >= start);
+                  if (firstIdx !== -1) {
+                    for (let j = firstIdx; j < navRows.length; j++) {
+                      const prevNav = j > 0 ? navRows[j - 1].nav : await findPrevTradingNav(data.code, navRows[j].date, navCache, data);
+                      if (!fundCodeStillInStorage(data.code)) break;
+                      if (!Number.isFinite(prevNav) || prevNav <= 0) continue;
+                      const nav = navRows[j].nav;
+                      const cursor = navRows[j].date;
+                      if (!Number.isFinite(nav) || nav <= 0) continue;
+                      const share = getEffectiveShare(cursor);
+                      if (share <= 0) continue;
                       const earnings = calcEarningsFromNavs(nav, prevNav, share);
                       const rate = calcRateFromNavs(nav, prevNav, h.cost);
                       if (Number.isFinite(earnings)) {
-                        localRecordToChanges(scope, data.code, earnings, latestNavDate, rate);
+                        localRecordToChanges(scope, data.code, earnings, cursor, rate);
                       }
-                    }
-                  }
-                } catch { }
-              }
-            } else if (isValidDateStr(lastRecordedDate) && lastRecordedDate < latestNavDate) {
-              const latestNav = Number(data.dwjz);
-              if (Number.isFinite(latestNav) && latestNav > 0) navCache.set(latestNavDate, latestNav);
-
-              const start = addDays(lastRecordedDate, 1);
-              const navRows = await fetchFundNetValueRange(data.code, lastRecordedDate, latestNavDate);
-              if (fundCodeStillInStorage(data.code)) {
-                for (const r of navRows) navCache.set(r.date, r.nav);
-                const firstIdx = navRows.findIndex((r) => r.date >= start);
-                if (firstIdx !== -1) {
-                  for (let j = firstIdx; j < navRows.length; j++) {
-                    const prevNav = j > 0 ? navRows[j - 1].nav : await findPrevTradingNav(data.code, navRows[j].date, navCache, data);
-                    if (!fundCodeStillInStorage(data.code)) break;
-                    if (!Number.isFinite(prevNav) || prevNav <= 0) continue;
-                    const nav = navRows[j].nav;
-                    const cursor = navRows[j].date;
-                    if (!Number.isFinite(nav) || nav <= 0) continue;
-                    const share = getEffectiveShare(cursor);
-                    if (share <= 0) continue;
-                    const earnings = calcEarningsFromNavs(nav, prevNav, share);
-                    const rate = calcRateFromNavs(nav, prevNav, h.cost);
-                    if (Number.isFinite(earnings)) {
-                      localRecordToChanges(scope, data.code, earnings, cursor, rate);
                     }
                   }
                 }
               }
             }
+          } catch (e) {
+            console.warn(`记录 ${data.code} 每日收益失败`, e);
           }
-        } catch (e) {
-          console.warn(`记录 ${data.code} 每日收益失败`, e);
         }
       });
 
