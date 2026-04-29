@@ -424,11 +424,7 @@ export default function HomePage() {
   }, []);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [loginError, setLoginError] = useState('');
-  const [loginSuccess, setLoginSuccess] = useState('');
-  const [loginOtp, setLoginOtp] = useState('');
+  const [loginInitialError, setLoginInitialError] = useState('');
 
   const userAvatar = useMemo(() => {
     if (!user?.id) return '';
@@ -3828,7 +3824,7 @@ export default function HomePage() {
     const handleSession = async (session, event, isExplicitLogin = false) => {
       if (!session?.user) {
         if (event === 'SIGNED_OUT' && !isLoggingOutRef.current) {
-          setLoginError('会话已过期，请重新登录');
+          setLoginInitialError('会话已过期，请重新登录');
           setLoginModalOpen(true);
         }
         isLoggingOutRef.current = false;
@@ -3856,7 +3852,7 @@ export default function HomePage() {
           });
         } catch { }
         clearAuthState();
-        setLoginError('会话已过期，请重新登录');
+        setLoginInitialError('会话已过期，请重新登录');
         showToast('会话已过期，请重新登录', 'error');
         setLoginModalOpen(true);
         return;
@@ -3864,9 +3860,7 @@ export default function HomePage() {
       setAuthUser(session.user);
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
         setLoginModalOpen(false);
-        setLoginEmail('');
-        setLoginSuccess('');
-        setLoginError('');
+        setLoginInitialError('');
       }
       // 仅在明确的登录动作（SIGNED_IN）时检查冲突；INITIAL_SESSION（刷新页面等）不检查，直接以云端为准
       fetchCloudConfig(session.user.id, isExplicitLogin);
@@ -3917,113 +3911,14 @@ export default function HomePage() {
     };
   }, [user?.id]);
 
-  const handleSendOtp = async (e) => {
-    e.preventDefault();
-    setLoginError('');
-    setLoginSuccess('');
-    if (!isSupabaseConfigured) {
-      showToast('未配置 Supabase，无法登录', 'error');
-      return;
-    }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!loginEmail.trim()) {
-      setLoginError('请输入邮箱地址');
-      return;
-    }
-    if (!emailRegex.test(loginEmail.trim())) {
-      setLoginError('请输入有效的邮箱地址');
-      return;
-    }
-
-    setLoginLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: loginEmail.trim(),
-        options: {
-          shouldCreateUser: true
-        }
-      });
-      if (error) throw error;
-      setLoginSuccess('验证码已发送，请查收邮箱输入验证码完成注册/登录');
-    } catch (err) {
-      if (err.message?.includes('rate limit')) {
-        setLoginError('请求过于频繁，请稍后再试');
-      } else if (err.message?.includes('network')) {
-        setLoginError('网络错误，请检查网络连接');
-      } else {
-        setLoginError(err.message || '发送验证码失败，请稍后再试');
-      }
-    } finally {
-      setLoginLoading(false);
-    }
-  };
-
-  const handleVerifyEmailOtp = async () => {
-    setLoginError('');
-    if (!loginOtp || loginOtp.length < 4) {
-      setLoginError('请输入邮箱中的验证码');
-      return;
-    }
-    if (!isSupabaseConfigured) {
-      showToast('未配置 Supabase，无法登录', 'error');
-      return;
-    }
-    try {
-      isExplicitLoginRef.current = true;
-      setLoginLoading(true);
-      const { data, error } = await supabase.auth.verifyOtp({
-        email: loginEmail.trim(),
-        token: loginOtp.trim(),
-        type: 'email'
-      });
-      if (error) throw error;
-      if (data?.user) {
-        setLoginModalOpen(false);
-        setLoginEmail('');
-        setLoginOtp('');
-        setLoginSuccess('');
-        setLoginError('');
-      }
-    } catch (err) {
-      setLoginError(err.message || '验证失败，请检查验证码或稍后再试');
-      isExplicitLoginRef.current = false;
-    }
-    setLoginLoading(false);
-  };
-
-  const handleGithubLogin = async () => {
-    setLoginError('');
-    if (!isSupabaseConfigured) {
-      showToast('未配置 Supabase，无法登录', 'error');
-      return;
-    }
-    try {
-      isExplicitLoginRef.current = true;
-      setLoginLoading(true);
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'github',
-        options: {
-          redirectTo: window.location.origin
-        }
-      });
-      if (error) throw error;
-    } catch (err) {
-      setLoginError(err.message || 'GitHub 登录失败，请稍后再试');
-      isExplicitLoginRef.current = false;
-      setLoginLoading(false);
-    }
-  };
 
   // 登出
   const handleLogout = async () => {
     isLoggingOutRef.current = true;
     if (!isSupabaseConfigured) {
       setLoginModalOpen(false);
-      setLoginError('');
-      setLoginSuccess('');
-      setLoginEmail('');
-      setLoginOtp('');
+      setLoginInitialError('');
       setUserMenuOpen(false);
       clearAuthUser();
       return;
@@ -4060,10 +3955,7 @@ export default function HomePage() {
         });
       } catch { }
       setLoginModalOpen(false);
-      setLoginError('');
-      setLoginSuccess('');
-      setLoginEmail('');
-      setLoginOtp('');
+      setLoginInitialError('');
       setUserMenuOpen(false);
       clearAuthUser();
     }
@@ -8462,27 +8354,15 @@ export default function HomePage() {
           <LoginModal
             onClose={() => {
               setLoginModalOpen(false);
-              setLoginError('');
-              setLoginSuccess('');
-              setLoginEmail('');
-              setLoginOtp('');
-              setLoginLoading(false);
+              setLoginInitialError('');
             }}
             isMobile={isMobile}
-            loginEmail={loginEmail}
-            setLoginEmail={setLoginEmail}
-            loginOtp={loginOtp}
-            setLoginOtp={setLoginOtp}
-            loginLoading={loginLoading}
-            loginError={loginError}
-            loginSuccess={loginSuccess}
-            handleSendOtp={handleSendOtp}
-            handleVerifyEmailOtp={handleVerifyEmailOtp}
-            handleGithubLogin={isSupabaseConfigured && process.env.NEXT_PUBLIC_IS_GITHUB_LOGIN === 'true' ? handleGithubLogin : undefined}
+            showToast={showToast}
+            isExplicitLoginRef={isExplicitLoginRef}
+            initialError={loginInitialError}
           />
         )}
       </AnimatePresence>
-
       {/* 排序个性化设置弹框 */}
       <AnimatePresence>
         {sortSettingOpen && (
