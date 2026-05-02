@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useMemo, useLayoutEffect, useCallback, useTransition, useDeferredValue } from 'react';
+import dynamic from 'next/dynamic';
 import ScanButton from './components/ScanButton';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
@@ -48,32 +49,34 @@ import {
   FolderPlusIcon,
 } from "./components/Icons";
 import AddFundToGroupModal from "./components/AddFundToGroupModal";
-import CloudConfigModal from "./components/CloudConfigModal";
+// 高频组件：同步加载
 import ConfirmModal from "./components/ConfirmModal";
-import DonateModal from "./components/DonateModal";
-import FeedbackModal from "./components/FeedbackModal";
 import GroupManageModal from "./components/GroupManageModal";
 import GroupModal from "./components/GroupModal";
 import HoldingEditModal from "./components/HoldingEditModal";
 import HoldingActionModal from "./components/HoldingActionModal";
 import LoginModal from "./components/LoginModal";
-import ScanImportConfirmModal from "./components/ScanImportConfirmModal";
-import ScanImportProgressModal from "./components/ScanImportProgressModal";
-import ScanPickModal from "./components/ScanPickModal";
-import ScanProgressModal from "./components/ScanProgressModal";
 import SettingsModal from "./components/SettingsModal";
 import SuccessModal from "./components/SuccessModal";
 import TradeModal from "./components/TradeModal";
 import TransactionHistoryModal from "./components/TransactionHistoryModal";
-import AddHistoryModal from "./components/AddHistoryModal";
-import UpdateChecker from "./components/UpdateChecker";
 import UserMenu from "./components/UserMenu";
 import RefreshButton from "./components/RefreshButton";
-import WeChatModal from "./components/WeChatModal";
-import DcaModal from "./components/DcaModal";
-import FundConvertModal from "./components/FundConvertModal";
-import SelectFundSingleModal from "./components/SelectFundSingleModal";
-import SelectHoldingGroupModal from "./components/SelectHoldingGroupModal";
+// 低频弹窗：懒加载，减少首屏 JS 解析体积
+const CloudConfigModal = dynamic(() => import('./components/CloudConfigModal'), { ssr: false });
+const DonateModal = dynamic(() => import('./components/DonateModal'), { ssr: false });
+const FeedbackModal = dynamic(() => import('./components/FeedbackModal'), { ssr: false });
+const WeChatModal = dynamic(() => import('./components/WeChatModal'), { ssr: false });
+const DcaModal = dynamic(() => import('./components/DcaModal'), { ssr: false });
+const FundConvertModal = dynamic(() => import('./components/FundConvertModal'), { ssr: false });
+const SelectFundSingleModal = dynamic(() => import('./components/SelectFundSingleModal'), { ssr: false });
+const SelectHoldingGroupModal = dynamic(() => import('./components/SelectHoldingGroupModal'), { ssr: false });
+const ScanImportConfirmModal = dynamic(() => import('./components/ScanImportConfirmModal'), { ssr: false });
+const ScanImportProgressModal = dynamic(() => import('./components/ScanImportProgressModal'), { ssr: false });
+const ScanPickModal = dynamic(() => import('./components/ScanPickModal'), { ssr: false });
+const ScanProgressModal = dynamic(() => import('./components/ScanProgressModal'), { ssr: false });
+const AddHistoryModal = dynamic(() => import('./components/AddHistoryModal'), { ssr: false });
+const UpdateChecker = dynamic(() => import('./components/UpdateChecker'), { ssr: false });
 import MarketIndexAccordion from "./components/MarketIndexAccordion";
 import SortSettingModal from "./components/SortSettingModal";
 import githubImg from "./assets/github.svg";
@@ -355,6 +358,7 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
+    let rafId = null;
     const updateHeights = () => {
       if (navbarRef.current) {
         setNavbarHeight(navbarRef.current.offsetHeight);
@@ -363,13 +367,22 @@ export default function HomePage() {
         setFilterBarHeight(filterBarRef.current.offsetHeight);
       }
     };
+    // rAF 节流，避免 resize 事件以 60fps 频率触发 setState
+    const onResize = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        updateHeights();
+      });
+    };
 
     // 初始延迟一下，确保渲染完成
     const timer = setTimeout(updateHeights, 100);
-    window.addEventListener('resize', updateHeights);
+    window.addEventListener('resize', onResize);
     return () => {
-      window.removeEventListener('resize', updateHeights);
+      window.removeEventListener('resize', onResize);
       clearTimeout(timer);
+      if (rafId) cancelAnimationFrame(rafId);
     };
   }, [groups, currentTab]); // groups 或 tab 变化可能导致 filterBar 高度变化
 
@@ -430,10 +443,21 @@ export default function HomePage() {
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      let rafId = null;
       const checkMobile = () => setIsMobile(window.innerWidth <= 640);
+      const onResize = () => {
+        if (rafId) return;
+        rafId = requestAnimationFrame(() => {
+          rafId = null;
+          checkMobile();
+        });
+      };
       checkMobile();
-      window.addEventListener('resize', checkMobile);
-      return () => window.removeEventListener('resize', checkMobile);
+      window.addEventListener('resize', onResize);
+      return () => {
+        window.removeEventListener('resize', onResize);
+        if (rafId) cancelAnimationFrame(rafId);
+      };
     }
   }, []);
 
@@ -1800,7 +1824,7 @@ export default function HomePage() {
       currentTab,
       summaryHoldingSourceGroupByCode,
       linkedHoldingsForAllFav,
-      fundTagRecords,
+      // fundTagRecords 已移除：fundTagListsByCode 是其派生值，两者同时存在会导致标签变化时双重触发
       fundTagListsByCode,
     ],
   );
@@ -2325,9 +2349,19 @@ export default function HomePage() {
 
   useEffect(() => {
     updateTabOverflow();
-    const onResize = () => updateTabOverflow();
+    let rafId = null;
+    const onResize = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        updateTabOverflow();
+      });
+    };
     window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
   }, [groups, funds.length, favorites.size]);
 
   // 成功提示弹窗
@@ -4438,21 +4472,29 @@ export default function HomePage() {
 
       // 【步骤 4】UI 与存储同步：统一更新 React 状态和本地 localStorage，减少页面重绘
       if (updated.length > 0) {
-        setFunds(prev => prev.map((f) => {
-          const next = updated.find(x => x.code === f.code);
-          if (!next) return f;
-          const merged = { ...next };
-          if (f.addedAt != null) merged.addedAt = f.addedAt;
-          if (f.addBaseNav != null) merged.addBaseNav = f.addBaseNav;
-          if (f.addBaseDate != null) merged.addBaseDate = f.addBaseDate;
-          if (merged.addedAt == null || merged.addBaseNav == null || merged.addBaseDate == null) {
-            const snap = getAddBaseSnapshotFromFund(merged);
-            if (merged.addedAt == null) merged.addedAt = Date.now();
-            if (merged.addBaseNav == null && snap.nav != null) merged.addBaseNav = snap.nav;
-            if (merged.addBaseDate == null && snap.date) merged.addBaseDate = snap.date;
-          }
-          return merged;
-        }));
+        setFunds(prev => {
+          // 优化：先建 Map 做 O(n) 查找，避免 prev.map + updated.find 的 O(n²)
+          const updatedMap = new Map(updated.map(x => [x.code, x]));
+          let changed = false;
+          const next = prev.map((f) => {
+            const u = updatedMap.get(f.code);
+            if (!u) return f;
+            changed = true;
+            const merged = { ...u };
+            if (f.addedAt != null) merged.addedAt = f.addedAt;
+            if (f.addBaseNav != null) merged.addBaseNav = f.addBaseNav;
+            if (f.addBaseDate != null) merged.addBaseDate = f.addBaseDate;
+            if (merged.addedAt == null || merged.addBaseNav == null || merged.addBaseDate == null) {
+              const snap = getAddBaseSnapshotFromFund(merged);
+              if (merged.addedAt == null) merged.addedAt = Date.now();
+              if (merged.addBaseNav == null && snap.nav != null) merged.addBaseNav = snap.nav;
+              if (merged.addBaseDate == null && snap.date) merged.addBaseDate = snap.date;
+            }
+            return merged;
+          });
+          // 引用相等时直接返回 prev，不触发下游重渲
+          return changed ? next : prev;
+        });
         if (valuationChanged) {
           setValuationSeries(prev => {
             const next = { ...prev };
@@ -6578,11 +6620,19 @@ export default function HomePage() {
     ]
   );
 
+  // 用 ref 同步 isAnyModalOpen，避免 scroll listener 因任意弹窗开关而频繁重注册
+  const isAnyModalOpenRef = useRef(false);
   useEffect(() => {
-    if (!isMobile || mobileMainTab !== 'home' || isAnyModalOpen) return;
+    isAnyModalOpenRef.current = isAnyModalOpen;
+  }, [isAnyModalOpen]);
+
+  useEffect(() => {
+    if (!isMobile || mobileMainTab !== 'home') return;
 
     let ticking = false;
     const handleScroll = () => {
+      // 从 ref 读取，无需将 isAnyModalOpen 加入 deps，listener 不再因弹窗变化重注册
+      if (isAnyModalOpenRef.current) return;
       if (!ticking) {
         requestAnimationFrame(() => {
           const currentScrollY = window.scrollY;
@@ -6607,7 +6657,7 @@ export default function HomePage() {
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [isMobile, mobileMainTab, isAnyModalOpen]);
+  }, [isMobile, mobileMainTab]); // isAnyModalOpen 已移至 ref，不再触发重注册
 
   useEffect(() => {
     if (!isMobile || mobileMainTab !== 'home') {
