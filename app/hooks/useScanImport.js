@@ -35,6 +35,7 @@ export function useScanImport({
   const setHoldings = useStorageStore((s) => s.setHoldings);
   const setFavorites = useStorageStore((s) => s.setFavorites);
   const setGroups = useStorageStore((s) => s.setGroups);
+  const setGroupHoldings = useStorageStore((s) => s.setGroupHoldings);
   const setCollapsedCodes = useStorageStore((s) => s.setCollapsedCodes);
   const setCollapsedTrends = useStorageStore((s) => s.setCollapsedTrends);
 
@@ -291,6 +292,12 @@ export function useScanImport({
   };
 
   const confirmScanImport = async (targetGroupId = 'all', expandAfterAdd = true) => {
+    const parseAmount = (val) => {
+      if (!val && val !== 0) return null;
+      const num = parseFloat(String(val).replace(/,/g, ''));
+      return isNaN(num) ? null : num;
+    };
+
     const rawCodes = Array.from(selectedScannedCodes);
     const targetExists = (code) => {
       if (!code) return false;
@@ -299,7 +306,16 @@ export function useScanImport({
       const g = groups.find((x) => x.id === targetGroupId);
       return !!(g && Array.isArray(g.codes) && g.codes.includes(code));
     };
-    const codes = rawCodes.filter((c) => !targetExists(c));
+
+    const codes = rawCodes.filter((c) => {
+      const exists = targetExists(c);
+      const scannedFund = scannedFunds.find(f => f.code === c);
+      const holdAmounts = parseAmount(scannedFund?.holdAmounts);
+      const holdGains = parseAmount(scannedFund?.holdGains);
+      const hasHoldingData = holdAmounts !== null && holdGains !== null;
+      return !exists || hasHoldingData;
+    });
+
     if (codes.length === 0) {
       showToast('所选基金已在目标分组中', 'info');
       return;
@@ -307,12 +323,6 @@ export function useScanImport({
     setScanConfirmModalOpen(false);
     setIsScanImporting(true);
     setScanImportProgress({ current: 0, total: codes.length, success: 0, failed: 0 });
-
-    const parseAmount = (val) => {
-      if (!val) return null;
-      const num = parseFloat(String(val).replace(/,/g, ''));
-      return isNaN(num) ? null : num;
-    };
 
     try {
       const newFunds = [];
@@ -334,7 +344,7 @@ export function useScanImport({
           const holdGains = parseAmount(scannedFund?.holdGains);
           const dwjz = data?.dwjz || data?.gsz || 0;
 
-          if (!existed && holdAmounts !== null && dwjz > 0) {
+          if (holdAmounts !== null && dwjz > 0) {
             const share = holdAmounts / dwjz;
             const profit = holdGains !== null ? holdGains : 0;
             const principal = holdAmounts - profit;
@@ -360,7 +370,14 @@ export function useScanImport({
         setFunds(prev => dedupeByCode([...newFunds, ...prev]));
 
         if (Object.keys(newHoldings).length > 0) {
-          setHoldings(prev => ({ ...prev, ...newHoldings }));
+          if (targetGroupId !== 'all' && targetGroupId !== 'fav') {
+            setGroupHoldings(prev => {
+              const bucket = prev[targetGroupId] ? { ...prev[targetGroupId] } : {};
+              return { ...prev, [targetGroupId]: { ...bucket, ...newHoldings } };
+            });
+          } else {
+            setHoldings(prev => ({ ...prev, ...newHoldings }));
+          }
         }
 
         const nextSeries = {};
@@ -425,13 +442,13 @@ export function useScanImport({
     // 状态
     scanModalOpen, setScanModalOpen,
     scanConfirmModalOpen, setScanConfirmModalOpen,
-    scannedFunds,
-    selectedScannedCodes,
+    scannedFunds, setScannedFunds,
+    selectedScannedCodes, setSelectedScannedCodes,
     isScanning,
     isScanImporting,
     scanImportProgress,
     scanProgress,
-    isOcrScan,
+    isOcrScan, setIsOcrScan,
     fileInputRef,
     // 操作
     handleScanClick,
