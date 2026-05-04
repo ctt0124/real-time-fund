@@ -77,15 +77,6 @@ export default function FundHistoryNetValueModal({ open, onOpenChange, code, the
   const scrollRef = useRef(null);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const mq = window.matchMedia('(max-width: 768px)');
-    const update = () => setIsMobile(mq.matches);
-    update();
-    mq.addEventListener('change', update);
-    return () => mq.removeEventListener('change', update);
-  }, []);
-
-  useEffect(() => {
     if (!open) return;
     setVisibleCount(30);
   }, [open, code]);

@@ -9,7 +9,7 @@ import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import { isNumber, isString } from 'lodash';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
-import { Stat } from './Common';
+import { Stat, ConsecutiveTrendBadge } from './Common';
 import FundTrendChart from './FundTrendChart';
 import FundIntradayChart from './FundIntradayChart';
 import FundDailyEarnings from './FundDailyEarnings';
@@ -83,6 +83,7 @@ export default function FundCard({
   masked = false,
   fundTags = [],
   onFundTagsClick,
+  fundExtraData,
 }) {
   const holding = holdings[f?.code];
   const profit = getHoldingProfit?.(f, holding) ?? null;
@@ -181,6 +182,7 @@ export default function FundCard({
                   <LinkIcon width="14" height="14" />
                 </span>
               ) : null}
+              <ConsecutiveTrendBadge trend={fundExtraData?.consecutiveTrend} />
               {f.name}
             </span>
             <span className="muted">

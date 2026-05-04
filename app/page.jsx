@@ -1197,12 +1197,12 @@ export default function HomePage() {
     });
   }, [funds, currentTab, favorites, activeGroupCodeSet]);
 
-  const [sortPeriodReturnsByCode, setSortPeriodReturnsByCode] = useState({});
-  const sortPeriodReturnsCacheRef = useRef(new Map());
+  const [fundExtraDataByCode, setFundExtraDataByCode] = useState({});
+  const fundExtraDataCacheRef = useRef(new Map());
   const needsSortPeriodReturns = ['last1Week', 'last1Month', 'last3Months', 'last6Months', 'last1Year'].includes(sortBy);
 
   useEffect(() => {
-    if (!needsSortPeriodReturns) return;
+    // 始终尝试为当前列表基金获取额外数据（阶段涨跌幅、连涨连跌），用于展示图标或排序
     const codes = scopedFunds.map(f => f.code);
     if (codes.length === 0) return;
 
@@ -1211,15 +1211,15 @@ export default function HomePage() {
     const cachedBatch = {};
 
     for (const code of codes) {
-      if (!sortPeriodReturnsCacheRef.current.has(code)) {
+      if (!fundExtraDataCacheRef.current.has(code)) {
         missing.push(code);
       } else {
-        cachedBatch[code] = sortPeriodReturnsCacheRef.current.get(code);
+        cachedBatch[code] = fundExtraDataCacheRef.current.get(code);
       }
     }
 
     if (Object.keys(cachedBatch).length > 0) {
-      setSortPeriodReturnsByCode((prev) => {
+      setFundExtraDataByCode((prev) => {
         let changed = false;
         const next = { ...prev };
         for (const [code, value] of Object.entries(cachedBatch)) {
@@ -1235,11 +1235,12 @@ export default function HomePage() {
     if (missing.length === 0) return;
 
     (async () => {
+      // 这里的 fetchFundPeriodReturns 已包含阶段涨跌幅和连涨连跌数据
       await asyncPool(4, missing, async (code) => {
         const value = await fetchFundPeriodReturns(code);
-        sortPeriodReturnsCacheRef.current.set(code, value);
+        fundExtraDataCacheRef.current.set(code, value);
         if (cancelled) return;
-        setSortPeriodReturnsByCode((prev) => {
+        setFundExtraDataByCode((prev) => {
           if (prev[code] === value) return prev;
           return { ...prev, [code]: value };
         });
@@ -1249,7 +1250,7 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [scopedFunds, needsSortPeriodReturns]);
+  }, [scopedFunds]);
 
   // 过滤和排序后的基金列表（包含“列表搜索”过滤）
   const displayFundsRaw = useMemo(
@@ -1440,8 +1441,8 @@ export default function HomePage() {
         if (['last1Week', 'last1Month', 'last3Months', 'last6Months', 'last1Year'].includes(sortBy)) {
           const keyMap = { last1Week: 'week', last1Month: 'month', last3Months: 'month3', last6Months: 'month6', last1Year: 'year1' };
           const key = keyMap[sortBy];
-          const valA = sortPeriodReturnsByCode[a.code]?.[key];
-          const valB = sortPeriodReturnsByCode[b.code]?.[key];
+          const valA = fundExtraDataByCode[a.code]?.[key];
+          const valB = fundExtraDataByCode[b.code]?.[key];
           const hasA = valA != null && Number.isFinite(valA);
           const hasB = valB != null && Number.isFinite(valB);
           if (!hasA && !hasB) return 0;
@@ -1476,7 +1477,7 @@ export default function HomePage() {
         return 0;
       });
     },
-    [scopedFunds, currentTab, groups, sortBy, sortOrder, holdingsForTabWithLinked, getHoldingProfitForTab, deferredGroupFundSearchTerm, shouldShowGroupFundSearch, currentFundDailyEarnings, sortPeriodReturnsByCode, todayStr, fundTagListsByCode],
+    [scopedFunds, currentTab, groups, sortBy, sortOrder, holdingsForTabWithLinked, getHoldingProfitForTab, deferredGroupFundSearchTerm, shouldShowGroupFundSearch, currentFundDailyEarnings, fundExtraDataByCode, todayStr, fundTagListsByCode],
   );
 
   const displayFunds = useDeferredValue(displayFundsRaw);
@@ -6326,6 +6327,7 @@ export default function HomePage() {
       isHoldingLinked: !!row?.isHoldingLinked,
       fundTags: row?.fundTags || [],
       onFundTagsClick: openFundTagsEdit,
+      fundExtraData: fundExtraDataByCode[fund.code],
     };
   }, [
     todayStr,
@@ -6354,6 +6356,8 @@ export default function HomePage() {
     toggleTrendCollapse,
     toggleEarningsCollapse,
     maskAmounts,
+    openFundTagsEdit,
+    fundExtraDataByCode,
   ]);
 
   return (
@@ -6974,7 +6978,9 @@ export default function HomePage() {
                                 masked={maskAmounts}
                                 getFundCardProps={getFundCardPropsForRow}
                                 onFundTagsClick={openFundTagsEdit}
-                              />
+                                fundExtraDataByCode={fundExtraDataByCode}
+                                />
+
                             </div>
                           </div>
                         </div>
@@ -7016,6 +7022,7 @@ export default function HomePage() {
                         getFundCardProps={getFundCardPropsForRow}
                         masked={maskAmounts}
                         onFundTagsClick={openFundTagsEdit}
+                        fundExtraDataByCode={fundExtraDataByCode}
                       />
                     )}
                     <AnimatePresence mode="popLayout">
@@ -7064,6 +7071,7 @@ export default function HomePage() {
                               masked={maskAmounts}
                               fundTags={Array.isArray(fundTagListsByCode[f.code]) ? fundTagListsByCode[f.code] : []}
                               onFundTagsClick={openFundTagsEdit}
+                              fundExtraData={fundExtraDataByCode[f.code]}
                             />
                         </motion.div>
                       ))}

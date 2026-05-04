@@ -30,6 +30,7 @@ import MobileSettingModal from './MobileSettingModal';
 import MoveGroupModal from './MoveGroupModal';
 import SuccessModal from './SuccessModal';
 import { ArrowUpToLineIcon, CloseIcon, DragIcon, FolderPlusIcon, LinkIcon, PencilIcon, SettingsIcon, StarIcon, TrashIcon } from './Icons';
+import { ConsecutiveTrendBadge } from './Common';
 import { fetchFundPeriodReturns, fetchRelatedSectors, fetchRelatedSectorLiveQuote } from '@/app/api/fund';
 import { storageStore } from '../stores';
 import { asyncPool } from '@/app/lib/asyncHelper';
@@ -353,6 +354,7 @@ export default function MobileFundTable({
   onFundCardDrawerOpenChange,
   onMobileSettingModalOpenChange,
   onFundTagsClick,
+  fundExtraDataByCode = {},
 }) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editSelectedCodes, setEditSelectedCodes] = useState(() => new Set());
@@ -1174,6 +1176,7 @@ export default function MobileFundTable({
                   <LinkIcon width="14" height="14" />
                 </span>
               ) : null}
+              <ConsecutiveTrendBadge trend={fundExtraDataByCode?.[code]?.consecutiveTrend} />
               {info.getValue() ?? '—'}
             </span>
             {holdingAmountDisplay ? (
@@ -1270,6 +1273,7 @@ export default function MobileFundTable({
                 <LinkIcon width="14" height="14" />
               </span>
             ) : null}
+            <ConsecutiveTrendBadge trend={fundExtraDataByCode?.[code]?.consecutiveTrend} />
             {info.getValue() ?? '—'}
           </span>
           {holdingAmountDisplay ? (
