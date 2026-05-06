@@ -79,9 +79,9 @@ export default function Announcement() {
             </div>
             <div style={{ color: 'var(--text)', lineHeight: '1.6', fontSize: '15px', overflowY: 'auto', minHeight: 0, flex: 1, paddingRight: '4px' }}>
               <p>v1.3.5 更新内容如下：</p>
-              <p>1. 新增设备同步乐观锁，避免因设备同步失败导致数据丢失。</p>
+              <p>1. 新增单账号多设备同步乐观锁，避免因设备同步失败导致数据丢失。</p>
               <p>2. 新增连续涨跌标识。</p>
-              <p>3. 调截图识别允许覆盖已添加数据的持仓金额。</p>
+              <p>3. 截图识别允许覆盖已添加数据的持仓金额。</p>
               <p>4. 移动端rem适配。</p>
             </div>
 
